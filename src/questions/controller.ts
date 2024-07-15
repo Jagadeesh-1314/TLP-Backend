@@ -52,9 +52,6 @@ export async function getSubjects(req: Request, res: Response) {
   }
 }
 
-
-
-
 export async function postScore(req: Request, res: Response) {
   try {
     const { stuID, facID, subCode, qtype, score, totalScore } = req.body;
@@ -88,6 +85,7 @@ export async function postScore(req: Request, res: Response) {
   }
 }
 
+
 export async function updateToken(req: Request, res: Response) {
   const rollno = req.query.rollno as string;
   try {
@@ -97,6 +95,15 @@ export async function updateToken(req: Request, res: Response) {
     const query = `UPDATE studentinfo SET token = 'done' WHERE rollno = '${rollno}';`
     await dbQuery(query);
     return res.json({ done: true });
+  }catch(e){
+    console.log(e);
+  }
+}
+
+export async function unfilledstudents(req: Request, res: Response) {
+  try {
+    const unfilledstudents = await dbQuery(`SELECT rollno, name, sec, sem FROM STUDENTINFO WHERE TOKEN = 'UNDONE';`);
+    return res.json({ done: true, unfilledstudents: unfilledstudents });
 
   } catch (err) {
     console.error("Error updating token:", err);
@@ -154,7 +161,7 @@ export async function report(req: Request, res: Response) {
   try {
 
     const query = `
-      SELECT COUNT(si.sec) as count, f.facID, ts.subcode, f.facName, si.sec, SUM(ts.score) as totalScore
+      SELECT COUNT(si.sec) as count, f.facID, ts.subcode, f.facName, si.sec, si.sem, SUM(ts.score) as totalScore
       FROM theoryscore ts
       JOIN faculty f ON ts.facID = f.facID
       JOIN studentinfo si ON ts.rollno = si.rollno
@@ -170,10 +177,10 @@ export async function report(req: Request, res: Response) {
     const data = result;
 
     for (const row of data) {
-      const { count, facID, subcode, facName, sec, totalScore } = row;
+      const { count, facID, subcode, facName, sec, sem, totalScore } = row;
       const insertQuery = `
-        INSERT INTO report (facID, facname, subcode, sec, percentile)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO report (facID, facname, subcode, sec, sem, percentile)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
         percentile = VALUES(percentile)
       `;
@@ -183,12 +190,13 @@ export async function report(req: Request, res: Response) {
         facName,
         subcode,
         sec,
+        sem,
         (totalScore / count) * 20,
       ]);
     }
 
     const labquery = `
-      SELECT COUNT(si.sec) as count, f.facID, ls.subcode, f.facName, si.sec, 
+      SELECT COUNT(si.sec) as count, f.facID, ls.subcode, f.facName, si.sec, si.sem,
       SUM(ls.score) as totalScore
       FROM labscore ls 
       JOIN faculty f ON ls.facID = f.facID 
@@ -205,10 +213,10 @@ export async function report(req: Request, res: Response) {
     const labdata = labresult;
 
     for (const row of labdata) {
-      const { count, subcode, facID, facName, sec, totalScore } = row;
+      const { count, subcode, facID, facName, sec, sem, totalScore } = row;
       const insertQuery = `
-        INSERT INTO report (facID, facname, subcode, sec, percentile)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO report (facID, facname, subcode, sec, sem, percentile)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
         percentile = VALUES(percentile)
       `;
@@ -218,15 +226,14 @@ export async function report(req: Request, res: Response) {
         facName,
         subcode,
         sec,
+        sem,
         (totalScore / count) * 20,
       ]);
     }
 
     const report: any = await dbQuery(`SELECT report.*, subjects.subname FROM report JOIN subjects ON TRIM(report.subcode) = TRIM(subjects.subcode);`);
-    const secQuery =
-      `SELECT sec FROM report GROUP BY sec;`;
 
-    const sec: any = await dbQuery(secQuery);
+    const sec: any = await dbQuery(`SELECT sec, sem FROM studentinfo GROUP BY sec, sem;`);
     Lstn70()
     return res.json({ done: true, sec: sec, report: report });
   } catch (error) {
