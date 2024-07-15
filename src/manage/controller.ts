@@ -9,19 +9,18 @@ import {  UsersTableArr } from "../interfaces/manage";
 
 // ANCHOR Getting Student Details 
 
-export async function getStdDetails(req: Request, res: Response) {
-    const { query } = req;
-    const { rollNo, tableName } = query;
-    if (isAnyUndefined(rollNo, tableName)) {
+export async function getTable(req: Request, res: Response) {
+    const { tableName } = req.query;
+    if (isAnyUndefined(tableName)) {
         res.status(400).json(responses.NotAllParamsGiven);
         return;
     }
     try {
-        let stdData: any = await dbQuery(
-            `SELECT * FROM ${tableName} WHERE rollNo = '${rollNo}' ORDER BY acYear ASC, sem ASC, subCode ASC`
+        let timeTable: any = await dbQuery(
+            `SELECT * FROM ${tableName} `
         );
-        stdData = JSON.parse(JSON.stringify(stdData));
-        res.json({ stdData });
+        timeTable = JSON.parse(JSON.stringify(timeTable));
+        res.json({ tableData: timeTable });
     } catch (err) {
         logger.log("error", err);
         res.json(responses.ErrorWhileDBRequest);

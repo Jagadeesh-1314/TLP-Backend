@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import {
-  getStdDetails,
+  getTable,
   editStdDetails,
   addStdDetails,
   deleteStdDetails,
@@ -15,6 +15,7 @@ import {
 const router: Router = Router();
 
 // Registering all the Manage Users routes
+router.get("/table", getTable);
 
 // Getting Users
 router.get("/users", getUsers);
