@@ -49,7 +49,7 @@ export async function isUserValid(req: Request, res: Response) {
   
   let query;
   if (userResult.length === 0) {
-    query = `SELECT rollno AS userName, password, Name as displayName FROM studentinfo WHERE BINARY rollno = '${username}';`;
+    query = `SELECT rollno AS userName, password, Name as displayName, branch, batch FROM studentinfo WHERE BINARY rollno = '${username}';`;
   }
   else {
     query = `SELECT userName, password, displayName FROM users WHERE BINARY userName = '${username}';`;
@@ -79,6 +79,8 @@ export async function isUserValid(req: Request, res: Response) {
         username: username,
         displayName: result[0]["displayName"],
         desg: userResult.length !== 0? 'admin' : 'null',
+        branch: result[0]["branch"],
+        batch: result[0]["batch"],
       });
     })
     .catch(function (err) {

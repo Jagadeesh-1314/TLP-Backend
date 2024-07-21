@@ -5,6 +5,7 @@ export interface SubNames {
   export interface UsersTableProps {
     username: string;
     displayName: string;
+    branch: string;
   }
 
   export interface questionsTableProps {
