@@ -453,7 +453,7 @@ export async function unfilledstudents(req: Request, res: Response) {
       `SELECT rollno, name, sec, sem FROM studentinfo WHERE sem = ${sem} AND sec = '${sec}' and token = 'undone'`,
     );
     let i: number = Number(sem) / 2;
-    let j: number = (Number(sem) % 2 != 0)? 1 : 2;
+    let j: number = (Number(sem) % 2 != 0) ? 1 : 2;
     const students: Student[] = result;
 
     const doc = new Document({
@@ -490,7 +490,7 @@ export async function unfilledstudents(req: Request, res: Response) {
                         bottom: 100,
                         left: 10,
                         right: 10,
-                    },
+                      },
                     }),
                     new TableCell({
                       children: [new Paragraph("Roll No")],
@@ -501,7 +501,7 @@ export async function unfilledstudents(req: Request, res: Response) {
                         bottom: 100,
                         left: 10,
                         right: 10,
-                    },
+                      },
                     }),
                     new TableCell({
                       children: [new Paragraph("Student Name")],
@@ -512,7 +512,7 @@ export async function unfilledstudents(req: Request, res: Response) {
                         bottom: 100,
                         left: 10,
                         right: 10,
-                    },
+                      },
                     }),
                   ],
                 }),
@@ -538,7 +538,7 @@ export async function unfilledstudents(req: Request, res: Response) {
       ],
     });
 
-    
+
     const buffer = await Packer.toBuffer(doc);
 
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
@@ -576,20 +576,20 @@ interface Report {
   percentile: number;
 }
 
-export async function downloadReport(req: Request, res: Response) {
-  const { sem, sec } = req.query;
+export async function downloadReport1(req: Request, res: Response) {
+  const { sem, sec, batch, count } = req.query;
 
-  if (!sem || !sec) {
+  if (!sem || !sec || !batch || !count ) {
     return res.status(400).send('Semester and Section are required.');
   }
 
   try {
+    
     const result: any = await dbQuery(
-      `SELECT facName, report.subcode, subjects.subname, sec, sem, percentile FROM report JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' and TRIM(subjects.subcode) = TRIM(report.subcode);`,
+      `SELECT facName,  subjects.subname, sec, sem, batch, percentile FROM report${count} JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' AND batch = ${batch} and TRIM(subjects.subcode) = TRIM(report${count}.subcode);`,
     );
-
     let i: number = Math.floor(Number(sem) / 2);
-    let j: number = (Number(sem) % 2 !== 0) ? 1 : 2;
+    let j: string = (Number(sem) % 2 !== 0) ? "I" : "II";
     const report: Report[] = result;
 
     const doc = new Document({
@@ -602,24 +602,42 @@ export async function downloadReport(req: Request, res: Response) {
                 new TextRun({
                   text: "Geethanjali College of Engineering and Technology",
                   font: {
-                    name: "Old English Text MT", 
+                    name: "Old English Text MT",
                   },
-                  size: 44, 
+                  size: 42,
                   bold: true,
                 }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+
+            new Paragraph({
+              children: [
                 new TextRun({
                   text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
                   font: {
-                    name: "Times New Roman", 
+                    name: "Times New Roman",
                   },
-                  size: 22, 
+                  size: 22,
+                  bold: true,
+                  italics: true,
                 }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+
+            new Paragraph({
+              children: [
                 new TextRun({
                   text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
                   font: {
-                    name: "Times New Roman", 
+                    name: "Times New Roman",
                   },
-                  size: 16, 
+                  size: 22,
+                  bold: true,
+                  italics: true,
                 }),
               ],
               alignment: AlignmentType.CENTER,
@@ -628,24 +646,34 @@ export async function downloadReport(req: Request, res: Response) {
 
             // Feedback Report Heading
             new Paragraph({
-              text: `Online Feedback report for 2023-24 ${i}-Semester Term-${j}`,
-              // font: {
-              //   name: "Times New Roman", 
-              // },
-              heading: HeadingLevel.HEADING_1,
-              // bold: true,
+              children: [
+                new TextRun({
+                  text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
               alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
+              spacing: { after: 100 },
             }),
 
             // Department Heading
             new Paragraph({
-              text: `Department of Computer Science and Engineering`,
-              // font: {
-              //   name: "Times New Roman", 
-              // },
-              heading: HeadingLevel.HEADING_1,
-              // bold: true,
+              children: [
+                new TextRun({
+                  text: `Department of Computer Science and Engineering`,
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
               alignment: AlignmentType.CENTER,
               spacing: { after: 200 },
             }),
@@ -654,7 +682,7 @@ export async function downloadReport(req: Request, res: Response) {
               text: `Section: ${i}-${sec}`,
               heading: HeadingLevel.HEADING_1,
               alignment: AlignmentType.CENTER,
-              spacing: { after: 300 },
+              spacing: { after: 500 },
             }),
             new Table({
               width: {
@@ -667,14 +695,14 @@ export async function downloadReport(req: Request, res: Response) {
                     new TableCell({
                       children: [new Paragraph({
                         children: [new TextRun({
-                          text: "SNo",
+                          text: "S.No",
                           bold: true,
-                          size: 20, 
+                          size: 25,
                         })],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 240 },
                       })],
-                      shading: { fill: "D3D3D3" },
+                      shading: { fill: "ADD8E6" },
                       verticalAlign: VerticalAlign.CENTER,
                       borders: {
                         top: { style: BorderStyle.SINGLE, size: 1 },
@@ -683,10 +711,10 @@ export async function downloadReport(req: Request, res: Response) {
                         right: { style: BorderStyle.SINGLE, size: 1 },
                       },
                       margins: {
-                        top: 100,
-                        bottom: 100,
-                        left: 10,
-                        right: 10,
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
                       },
                     }),
                     new TableCell({
@@ -694,12 +722,12 @@ export async function downloadReport(req: Request, res: Response) {
                         children: [new TextRun({
                           text: "Faculty Name",
                           bold: true,
-                          size: 20,
+                          size: 25,
                         })],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 240 },
                       })],
-                      shading: { fill: "D3D3D3" },
+                      shading: { fill: "ADD8E6" },
                       verticalAlign: VerticalAlign.CENTER,
                       borders: {
                         top: { style: BorderStyle.SINGLE, size: 1 },
@@ -708,35 +736,10 @@ export async function downloadReport(req: Request, res: Response) {
                         right: { style: BorderStyle.SINGLE, size: 1 },
                       },
                       margins: {
-                        top: 100,
-                        bottom: 100,
-                        left: 10,
-                        right: 10,
-                      },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
-                          text: "Subject Code",
-                          bold: true,
-                          size: 20,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "D3D3D3" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 100,
-                        bottom: 100,
-                        left: 10,
-                        right: 10,
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
                       },
                     }),
                     new TableCell({
@@ -744,12 +747,12 @@ export async function downloadReport(req: Request, res: Response) {
                         children: [new TextRun({
                           text: "Subject Name",
                           bold: true,
-                          size: 20,
+                          size: 25,
                         })],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 240 },
                       })],
-                      shading: { fill: "D3D3D3" },
+                      shading: { fill: "ADD8E6" },
                       verticalAlign: VerticalAlign.CENTER,
                       borders: {
                         top: { style: BorderStyle.SINGLE, size: 1 },
@@ -758,10 +761,10 @@ export async function downloadReport(req: Request, res: Response) {
                         right: { style: BorderStyle.SINGLE, size: 1 },
                       },
                       margins: {
-                        top: 100,
-                        bottom: 100,
-                        left: 10,
-                        right: 10,
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
                       },
                     }),
                     new TableCell({
@@ -769,12 +772,12 @@ export async function downloadReport(req: Request, res: Response) {
                         children: [new TextRun({
                           text: "Percentile",
                           bold: true,
-                          size: 20,
+                          size: 25,
                         })],
                         alignment: AlignmentType.CENTER,
                         spacing: { after: 240 },
                       })],
-                      shading: { fill: "D3D3D3" },
+                      shading: { fill: "ADD8E6" },
                       verticalAlign: VerticalAlign.CENTER,
                       borders: {
                         top: { style: BorderStyle.SINGLE, size: 1 },
@@ -783,27 +786,28 @@ export async function downloadReport(req: Request, res: Response) {
                         right: { style: BorderStyle.SINGLE, size: 1 },
                       },
                       margins: {
-                        top: 100,
-                        bottom: 100,
-                        left: 10,
-                        right: 10,
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
                       },
                     }),
                   ],
                 }),
-                ...report.map((student, index) =>
+                ...report.map((item, index) =>
                   new TableRow({
                     children: [
                       new TableCell({
                         children: [new Paragraph({
                           children: [new TextRun({
-                            text: (index + 1).toString(),
+                            text: (index + 1).toString()+'.',
                             size: 24,
+                            bold: true,
                           })],
                           alignment: AlignmentType.CENTER,
                           spacing: { after: 240 },
                         })],
-                        shading: { fill: "E6E6E6" },
+                        shading: { fill: "ADD8E6" },
                         verticalAlign: VerticalAlign.CENTER,
                         borders: {
                           top: { style: BorderStyle.SINGLE, size: 1 },
@@ -812,16 +816,16 @@ export async function downloadReport(req: Request, res: Response) {
                           right: { style: BorderStyle.SINGLE, size: 1 },
                         },
                         margins: {
-                          top: 100,
-                          bottom: 100,
-                          left: 10,
-                          right: 10,
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
                         },
                       }),
                       new TableCell({
                         children: [new Paragraph({
                           children: [new TextRun({
-                            text: student.facName,
+                            text: item.facName,
                             size: 24,
                           })],
                           alignment: AlignmentType.CENTER,
@@ -835,16 +839,16 @@ export async function downloadReport(req: Request, res: Response) {
                           right: { style: BorderStyle.SINGLE, size: 1 },
                         },
                         margins: {
-                          top: 100,
-                          bottom: 100,
-                          left: 10,
-                          right: 10,
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
                         },
                       }),
                       new TableCell({
                         children: [new Paragraph({
                           children: [new TextRun({
-                            text: student.subcode,
+                            text: item.subname,
                             size: 24,
                           })],
                           alignment: AlignmentType.CENTER,
@@ -858,16 +862,16 @@ export async function downloadReport(req: Request, res: Response) {
                           right: { style: BorderStyle.SINGLE, size: 1 },
                         },
                         margins: {
-                          top: 100,
-                          bottom: 100,
-                          left: 10,
-                          right: 10,
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
                         },
                       }),
                       new TableCell({
                         children: [new Paragraph({
                           children: [new TextRun({
-                            text: student.subname,
+                            text: item.percentile.toString(),
                             size: 24,
                           })],
                           alignment: AlignmentType.CENTER,
@@ -881,33 +885,10 @@ export async function downloadReport(req: Request, res: Response) {
                           right: { style: BorderStyle.SINGLE, size: 1 },
                         },
                         margins: {
-                          top: 100,
-                          bottom: 100,
-                          left: 10,
-                          right: 10,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: student.percentile.toString(),
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 100,
-                          bottom: 100,
-                          left: 10,
-                          right: 10,
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
                         },
                       }),
                     ],
@@ -923,7 +904,360 @@ export async function downloadReport(req: Request, res: Response) {
     const buffer = await Packer.toBuffer(doc);
 
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    const filename = `Report${i}-${j}_${sec}_${timestamp}.docx`;
+    const filename = `Report-${i}-${j}_${sec}_${timestamp}.docx`;
+    const docFilePath = path.join(__dirname, 'tmp', filename);
+    fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
+
+    fs.writeFileSync(docFilePath, buffer);
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.sendFile(docFilePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        res.status(500).send('Internal Server Error');
+      } else {
+        fs.unlinkSync(docFilePath);
+      }
+    });
+
+    return { path: docFilePath, timestamp };
+  } catch (error) {
+    console.error('Error fetching data or generating document:', error);
+    res.status(500).send('Internal Server Error');
+  }
+}
+
+
+export async function downloadReport2(req: Request, res: Response) {
+  const { sem, sec, batch, count } = req.query;
+
+  if (!sem || !sec || !batch) {
+    return res.status(400).send('Semester and Section are required.');
+  }
+
+  try {
+   
+    const result: any = await dbQuery(
+      `SELECT facName,  subjects.subname, sec, sem, batch, percentile FROM report2 JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' AND batch = ${batch} and TRIM(subjects.subcode) = TRIM(report1.subcode);`,
+    );
+    let i: number = Math.floor(Number(sem) / 2);
+    let j: string = (Number(sem) % 2 !== 0) ? "I" : "II";
+    const report: Report[] = result;
+
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Geethanjali College of Engineering and Technology",
+                  font: {
+                    name: "Old English Text MT",
+                  },
+                  size: 42,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+
+            // Feedback Report Heading
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 100 },
+            }),
+
+            // Department Heading
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Department of Computer Science and Engineering`,
+                  font: {
+                    name: "Times New Roman",
+                  },
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+
+            new Paragraph({
+              text: `Section: ${i}-${sec}`,
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 500 },
+            }),
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "S.No",
+                          bold: true,
+                          size: 25,
+                        })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      })],
+                      shading: { fill: "ADD8E6" },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 1 },
+                        bottom: { style: BorderStyle.SINGLE, size: 1 },
+                        left: { style: BorderStyle.SINGLE, size: 1 },
+                        right: { style: BorderStyle.SINGLE, size: 1 },
+                      },
+                      margins: {
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
+                      },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Faculty Name",
+                          bold: true,
+                          size: 25,
+                        })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      })],
+                      shading: { fill: "ADD8E6" },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 1 },
+                        bottom: { style: BorderStyle.SINGLE, size: 1 },
+                        left: { style: BorderStyle.SINGLE, size: 1 },
+                        right: { style: BorderStyle.SINGLE, size: 1 },
+                      },
+                      margins: {
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
+                      },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Subject Name",
+                          bold: true,
+                          size: 25,
+                        })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      })],
+                      shading: { fill: "ADD8E6" },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 1 },
+                        bottom: { style: BorderStyle.SINGLE, size: 1 },
+                        left: { style: BorderStyle.SINGLE, size: 1 },
+                        right: { style: BorderStyle.SINGLE, size: 1 },
+                      },
+                      margins: {
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
+                      },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({
+                        children: [new TextRun({
+                          text: "Percentile",
+                          bold: true,
+                          size: 25,
+                        })],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      })],
+                      shading: { fill: "ADD8E6" },
+                      verticalAlign: VerticalAlign.CENTER,
+                      borders: {
+                        top: { style: BorderStyle.SINGLE, size: 1 },
+                        bottom: { style: BorderStyle.SINGLE, size: 1 },
+                        left: { style: BorderStyle.SINGLE, size: 1 },
+                        right: { style: BorderStyle.SINGLE, size: 1 },
+                      },
+                      margins: {
+                        top: 50,
+                        bottom: 50,
+                        left: 75,
+                        right: 75,
+                      },
+                    }),
+                  ],
+                }),
+                ...report.map((item, index) =>
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({
+                            text: (index + 1).toString()+'.',
+                            size: 24,
+                            bold: true,
+                          })],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 240 },
+                        })],
+                        shading: { fill: "ADD8E6" },
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.SINGLE, size: 1 },
+                          bottom: { style: BorderStyle.SINGLE, size: 1 },
+                          left: { style: BorderStyle.SINGLE, size: 1 },
+                          right: { style: BorderStyle.SINGLE, size: 1 },
+                        },
+                        margins: {
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
+                        },
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({
+                            text: item.facName,
+                            size: 24,
+                          })],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 240 },
+                        })],
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.SINGLE, size: 1 },
+                          bottom: { style: BorderStyle.SINGLE, size: 1 },
+                          left: { style: BorderStyle.SINGLE, size: 1 },
+                          right: { style: BorderStyle.SINGLE, size: 1 },
+                        },
+                        margins: {
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
+                        },
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({
+                            text: item.subname,
+                            size: 24,
+                          })],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 240 },
+                        })],
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.SINGLE, size: 1 },
+                          bottom: { style: BorderStyle.SINGLE, size: 1 },
+                          left: { style: BorderStyle.SINGLE, size: 1 },
+                          right: { style: BorderStyle.SINGLE, size: 1 },
+                        },
+                        margins: {
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
+                        },
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({
+                          children: [new TextRun({
+                            text: item.percentile.toString(),
+                            size: 24,
+                          })],
+                          alignment: AlignmentType.CENTER,
+                          spacing: { after: 240 },
+                        })],
+                        verticalAlign: VerticalAlign.CENTER,
+                        borders: {
+                          top: { style: BorderStyle.SINGLE, size: 1 },
+                          bottom: { style: BorderStyle.SINGLE, size: 1 },
+                          left: { style: BorderStyle.SINGLE, size: 1 },
+                          right: { style: BorderStyle.SINGLE, size: 1 },
+                        },
+                        margins: {
+                          top: 50,
+                          bottom: 50,
+                          left: 75,
+                          right: 75,
+                        },
+                      }),
+                    ],
+                  })
+                ),
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+    const filename = `Report-${i}-${j}_${sec}_${timestamp}.docx`;
     const docFilePath = path.join(__dirname, 'tmp', filename);
     fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
 

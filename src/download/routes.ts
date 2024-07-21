@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { downloadHandler, manageDBdownloadHandler, backupHandler, unfilledstudents, downloadReport } from "./controller";
+import { downloadHandler, manageDBdownloadHandler, backupHandler, unfilledstudents, downloadReport1 } from "./controller";
 
 const router: Router = Router();
 
@@ -8,6 +8,6 @@ router.get("/table", downloadHandler);
 router.get("/manage-db/:rollNo", manageDBdownloadHandler);
 router.get("/backup", backupHandler);
 router.post("/unfilledlist", unfilledstudents);
-router.get("/downloadReport", downloadReport);
+router.get("/downloadReport", downloadReport1);
 
 export default router;

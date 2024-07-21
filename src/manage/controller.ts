@@ -174,7 +174,7 @@ export async function deleteStdDetails(req: Request, res: Response) {
 export async function getUsers(_req: Request, res: Response) {
   try {
     const users = (await dbQuery(
-      "SELECT username, displayName FROM users"
+      "SELECT username, displayName, branch FROM users"
     )) as UsersTableArr;
     return res.json({ users: users });
   } catch (err) {
@@ -188,12 +188,13 @@ export async function addUser(req: Request, res: Response) {
   const username: string = req.body.details.username;
   const password: string = md5(req.body.details.password);
   const displayName: string = req.body.details.displayName;
-  if (isAnyUndefined(username, password, displayName)) {
+  const branch: string = req.body.details.branch;
+  if (isAnyUndefined(username, password, displayName, branch)) {
     return res.status(400).json(responses.NotAllParamsGiven);
   }
   try {
     await dbQuery(
-      `INSERT INTO users VALUES ('${username}','${password}','${displayName}', 'admin')`
+      `INSERT INTO users VALUES ('${username}','${password}','${displayName}', 'admin', '${branch}')`
     );
     res.json({ done: true });
   } catch (err) {
