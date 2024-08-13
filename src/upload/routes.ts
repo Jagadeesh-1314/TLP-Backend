@@ -9,6 +9,7 @@ import {
   uploadFile,
 } from "./controller";
 import multer from "multer";
+import { verifyToken } from "../login/controller";
 
 
 const tmpStorage = multer.diskStorage({
@@ -30,7 +31,7 @@ const router: Router = Router();
 
 router.post("/:tableName", upload.fields([{
   name: 'file'
-}]), uploadFile);
+}]),verifyToken, uploadFile);
 
 // restoring backup file
 // router.post("/studentinfo", restoreStudentInfo);
