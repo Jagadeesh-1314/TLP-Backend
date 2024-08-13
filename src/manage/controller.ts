@@ -189,6 +189,7 @@ export async function addUser(req: Request, res: Response) {
   const password: string = md5(req.body.details.password);
   const displayName: string = req.body.details.displayName;
   const branch: string = req.body.details.branch;
+  console.log(req.body)
   if (isAnyUndefined(username, password, displayName, branch)) {
     return res.status(400).json(responses.NotAllParamsGiven);
   }

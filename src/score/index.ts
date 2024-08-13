@@ -1,9 +1,9 @@
 import { Router } from "express";
-import uploadRouter from "./routes";
+import score from "./routes";
 
 const router = Router();
 
 // Defining the core path from which this module should be accessed
-router.use("/upload", uploadRouter)
+router.use("/", score);
 
 export default router;
