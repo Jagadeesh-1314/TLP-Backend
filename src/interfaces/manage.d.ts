@@ -16,13 +16,13 @@ export interface SubNames {
   export interface subjectTableProps {
     subCode: string;
     subName: string;
-    facID: number;
+    facID: string;
     qtype: string;
     facName: string;
   }
 
   export interface facultyTableProps {
-    facID: number;
+    facID: string;
     facName: string;
   }
   

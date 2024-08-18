@@ -1,7 +1,7 @@
 import { Response, Request } from "express";
 import dbQuery from "../services/db";
 import { responses } from "../services/common";
-import { UsersTableArr, subjectTableProps } from "../interfaces/manage";
+import { questionsTableArr, subjectTableProps } from "../interfaces/manage";
 interface ReportData {
   facID: number;
   facName: string;
@@ -18,7 +18,7 @@ export async function getQuestions(req: Request, res: Response) {
   try {
     const question = (await dbQuery(
       "SELECT * FROM questions"
-    )) as UsersTableArr;
+    )) as questionsTableArr;
     return res.json({ questions: question });
   } catch (err) {
     console.log(err);
@@ -119,7 +119,7 @@ async function Lstn70() {
 export async function getDetails(req: Request, res: Response) {
   try {
     const { batch, sem } = req.query
-    const sec = await dbQuery(`SELECT sec FROM studentinfo where batch=${batch} and sem=${sem} GROUP BY sec`);
+    const sec = await dbQuery(`SELECT sec FROM report1 where batch=${batch} and sem=${sem} GROUP BY sec`);
     res.json({ sec: sec });
   } catch (error) {
     console.error('Error executing query:', error);

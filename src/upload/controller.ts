@@ -18,7 +18,7 @@ const tables = [
   "subjects",
 ];
 
-function processCSVStudents(data: string, branch: string) {
+function processCSVStudents(data: string, branch: string, batch: string) {
   return data
     .trim()
     .split("\n")
@@ -26,8 +26,9 @@ function processCSVStudents(data: string, branch: string) {
       row
         .trim()
         .split(",")
+        .filter((cell) => cell !== null && cell !== "")
         .map((cell) => (cell ? `'${cell}'` : "NULL"))
-        .concat("'undone'", `md5('${row.split(",")[0]}')`, `'${branch}'`)
+        .concat( `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`, `'${branch}'`)
     )
     .map((row) => `(${row.join(",")})`);
 }
@@ -60,7 +61,7 @@ function processCSVSubjects(data: string, subtype: string) {
 }
 
 
-function processCSVTimeTable(data: string) {
+function processCSVTimeTable(data: string, branch: string) {
   return data
     .trim()
     .split("\n")
@@ -69,10 +70,11 @@ function processCSVTimeTable(data: string) {
         .trim()
         .split(",")
         .map((cell) => (cell ? `'${cell}'` : "NULL"))
+        .concat(`'${branch}'`)
     )
     .map((row) => `(${row.join(",")})`);
 }
-export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string) {
+export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string, batch: string) {
   try {
     const workbook = xlsx.readFile(location);
     const sheetName = workbook.SheetNames[0];
@@ -81,8 +83,7 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
 
     try {
       if (tableName === "studentinfo") {
-        console.log(branch)
-        const rows = processCSVStudents(data, branch);
+        const rows = processCSVStudents(data, branch, batch);
         let [_header, ...values] = rows;
         const query = `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`;
         const result = await dbQuery(query);
@@ -109,7 +110,7 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
         return responses.DoneMSG;
       }
       else if (tableName === "timetable") {
-        const rows = processCSVTimeTable(data);
+        const rows = processCSVTimeTable(data, branch);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
@@ -133,10 +134,10 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
 
 export const  uploadFile = async (req: Request, res: Response) => {
   try {
-    console.log(req.body);
     const { tableName } = req.params;
     const subtype = req.body.subtype;
     const branch = req.body.branchInToken;
+    const batch = req.body.batch;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     if (!files || !files['file'] || files['file'].length === 0) {
@@ -150,7 +151,7 @@ export const  uploadFile = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Unsupported file format' });
     }
 
-    const result = await uploadFromLoc(file.path, `${tableName}`, `${subtype}`, `${branch}`);
+    const result = await uploadFromLoc(file.path, `${tableName}`, `${subtype}`, `${branch}`, `${batch}`);
     if (result === responses.DoneMSG) {
       return res.json({ done: true });
     } else {
