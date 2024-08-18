@@ -3,6 +3,7 @@ import md5 from "md5";
 import dbQuery from "../services/db";
 import * as logger from "../services/logger";
 import { secret } from "../../config-local";
+import { setMaxIdleHTTPParsers } from "http";
 
 // Generate a token based on the username and secret
 // function generateToken(username: string) {
@@ -10,8 +11,8 @@ import { secret } from "../../config-local";
   
 // }
 
-function generateToken(username: string, branch: string) {
-  return `${username}@${branch}@${md5(username + branch + secret)}`;
+function generateToken(username: string, branch: string, sem: string) {
+  return `${username}@${branch}@${sem}@${md5(username + branch + sem + secret)}`;
 }
 
 // Middleware to verify the token
@@ -20,10 +21,11 @@ export function verifyToken(req: Request, res: Response, next: NextFunction) {
   if (cookies) {
     const cookieValue = cookies.Token as string;
     if (cookieValue) {
-      const [username, branch, _Token] = cookieValue.split("@");
-      if (generateToken(username, branch) === cookieValue) {
+      const [username, branch, sem, _Token] = cookieValue.split("@");
+      if (generateToken(username, branch, sem) === cookieValue) {
         req.body.usernameInToken = username;
         req.body.branchInToken = branch; 
+        req.body.semInToken = sem; 
         // console.log(req.body.branchInToken);
         next();
         return;
@@ -69,7 +71,7 @@ export async function isUserValid(req: Request, res: Response) {
   const userDesg = `SELECT desg FROM USERS WHERE USERNAME = '${username}'`;
   
   const userQuery = `SELECT * FROM users WHERE BINARY username = ?`;
-  const studentQuery = `SELECT rollno AS userName, password, Name as displayName, branch, batch FROM studentinfo WHERE BINARY rollno = ?`;
+  const studentQuery = `SELECT rollno AS userName, password, Name as displayName, branch, batch, sem FROM studentinfo WHERE BINARY rollno = ?`;
 
   try {
     const userResult: any = await dbQuery(userDesg);
@@ -101,8 +103,7 @@ export async function isUserValid(req: Request, res: Response) {
     const designation = userResult.length > 0 ? 'admin' : 'null';
 
     logger.log("info", `${username} has logged in from ${ip.slice(7)}`);
-    res.cookie("Token", generateToken(username, result[0]["branch"]), { httpOnly: true });
-
+    res.cookie("Token", generateToken(username, result[0]["branch"], result[0]["sem"]), { httpOnly: true });
     res.json({
       goahead: true,
       username: result[0]["userName"],
@@ -110,6 +111,7 @@ export async function isUserValid(req: Request, res: Response) {
       desg: designation,
       branch: result[0]["branch"],
       batch: result[0]["batch"],
+      sem: result[0]["sem"]
     });
   } catch (err) {
     logger.log("error", err);

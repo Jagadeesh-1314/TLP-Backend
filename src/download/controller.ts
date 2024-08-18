@@ -7,12 +7,15 @@ import * as fs from "fs";
 import { isAnyUndefined, responses } from "../services/common";
 import { FieldInfo } from "mysql";
 import dayjs from "dayjs";
-import { AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, VerticalAlign, HeadingLevel, PageBreak, TextRun, BorderStyle } from "docx";
+import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
+import { ChartConfiguration } from 'chart.js';
+import Chart from 'chart.js/auto';
+import { AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, VerticalAlign, HeadingLevel, TextRun, BorderStyle, SectionType, ISectionOptions, ImageRun } from "docx";
 
 type tableNames =
   | "faculty"
   | "report"
-  | "theoryscore"
+  | "theoryscore1"
   | "labscore"
   | "studentinfo"
   | "subjects"
@@ -300,7 +303,7 @@ async function downloadTable(
   if (tableName === "report") {
     out = await convertToDOCX(result, fields, tableName);
   } else {
-    out = await convertToXLSX(result, fields, tableName);
+    out = convertToXLSX(result, fields, tableName);
   }
 
   if ("error" in out) {
@@ -345,8 +348,8 @@ const tables: {
     ordering: " GROUP BY rollno, subcode ",
     fileName: "LabScore_info",
   },
-  theoryscore: {
-    query: `SELECT *  From theoryscore`,
+  theoryscore1: {
+    query: `SELECT *  From theoryscore1`,
     ordering: " GROUP BY rollno, subcode ",
     fileName: "TheoryScore_info",
   },
@@ -568,6 +571,10 @@ export async function unfilledstudents(req: Request, res: Response) {
 
 
 interface Report {
+  branch: string;
+  question: string;
+  total: any;
+  adjusted_total: any;
   facName: string;
   subcode: string;
   subname: string;
@@ -576,707 +583,1614 @@ interface Report {
   percentile: number;
 }
 
-export async function downloadReport1(req: Request, res: Response) {
+// export async function downloadReport(req: Request, res: Response) {
+//   const { sem, sec, batch, count } = req.query;
+
+//   if (!sem || !sec || !batch || !count ) {
+//     return res.status(400).send('Semester and Section are required.');
+//   }
+
+//   try {
+
+//     const result: any = await dbQuery(
+//       `SELECT facName,  subjects.subname, sec, sem, batch, percentile FROM report${count} JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' AND batch = ${batch} and TRIM(subjects.subcode) = TRIM(report${count}.subcode);`,
+//     );
+//     let i: number = Math.floor(Number(sem) / 2);
+//     let j: string = (Number(sem) % 2 !== 0) ? "I" : "II";
+//     const report: Report[] = result;
+
+//     const doc = new Document({
+//       sections: [
+//         {
+//           properties: {},
+//           children: [
+//             new Paragraph({
+//               children: [
+//                 new TextRun({
+//                   text: "Geethanjali College of Engineering and Technology",
+//                   font: {
+//                     name: "Old English Text MT",
+//                   },
+//                   size: 42,
+//                   bold: true,
+//                 }),
+//               ],
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 50 },
+//             }),
+
+//             new Paragraph({
+//               children: [
+//                 new TextRun({
+//                   text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+//                   font: {
+//                     name: "Times New Roman",
+//                   },
+//                   size: 22,
+//                   bold: true,
+//                   italics: true,
+//                 }),
+//               ],
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 50 },
+//             }),
+
+//             new Paragraph({
+//               children: [
+//                 new TextRun({
+//                   text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
+//                   font: {
+//                     name: "Times New Roman",
+//                   },
+//                   size: 22,
+//                   bold: true,
+//                   italics: true,
+//                 }),
+//               ],
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 200 },
+//             }),
+
+//             // Feedback Report Heading
+//             new Paragraph({
+//               children: [
+//                 new TextRun({
+//                   text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+//                   font: {
+//                     name: "Times New Roman",
+//                   },
+//                   size: 30,
+//                   bold: true,
+//                   italics: true,
+//                 }),
+//               ],
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 100 },
+//             }),
+
+//             // Department Heading
+//             new Paragraph({
+//               children: [
+//                 new TextRun({
+//                   text: `Department of Computer Science and Engineering`,
+//                   font: {
+//                     name: "Times New Roman",
+//                   },
+//                   size: 30,
+//                   bold: true,
+//                   italics: true,
+//                 }),
+//               ],
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 200 },
+//             }),
+
+//             new Paragraph({
+//               text: `Section: ${i}-${sec}`,
+//               heading: HeadingLevel.HEADING_1,
+//               alignment: AlignmentType.CENTER,
+//               spacing: { after: 500 },
+//             }),
+//             new Table({
+//               width: {
+//                 size: 100,
+//                 type: WidthType.PERCENTAGE,
+//               },
+//               rows: [
+//                 new TableRow({
+//                   children: [
+//                     new TableCell({
+//                       children: [new Paragraph({
+//                         children: [new TextRun({
+//                           text: "S.No",
+//                           bold: true,
+//                           size: 25,
+//                         })],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       })],
+//                       shading: { fill: "ADD8E6" },
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [new Paragraph({
+//                         children: [new TextRun({
+//                           text: "Faculty Name",
+//                           bold: true,
+//                           size: 25,
+//                         })],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       })],
+//                       shading: { fill: "ADD8E6" },
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [new Paragraph({
+//                         children: [new TextRun({
+//                           text: "Subject Name",
+//                           bold: true,
+//                           size: 25,
+//                         })],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       })],
+//                       shading: { fill: "ADD8E6" },
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [new Paragraph({
+//                         children: [new TextRun({
+//                           text: "Percentile",
+//                           bold: true,
+//                           size: 25,
+//                         })],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       })],
+//                       shading: { fill: "ADD8E6" },
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                   ],
+//                 }),
+//                 ...report.map((item, index) =>
+//                   new TableRow({
+//                     children: [
+//                       new TableCell({
+//                         children: [new Paragraph({
+//                           children: [new TextRun({
+//                             text: (index + 1).toString()+'.',
+//                             size: 24,
+//                             bold: true,
+//                           })],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         })],
+//                         shading: { fill: "ADD8E6" },
+//                         verticalAlign: VerticalAlign.CENTER,
+//                         borders: {
+//                           top: { style: BorderStyle.SINGLE, size: 1 },
+//                           bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                           left: { style: BorderStyle.SINGLE, size: 1 },
+//                           right: { style: BorderStyle.SINGLE, size: 1 },
+//                         },
+//                         margins: {
+//                           top: 50,
+//                           bottom: 50,
+//                           left: 75,
+//                           right: 75,
+//                         },
+//                       }),
+//                       new TableCell({
+//                         children: [new Paragraph({
+//                           children: [new TextRun({
+//                             text: item.facName,
+//                             size: 24,
+//                           })],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         })],
+//                         verticalAlign: VerticalAlign.CENTER,
+//                         borders: {
+//                           top: { style: BorderStyle.SINGLE, size: 1 },
+//                           bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                           left: { style: BorderStyle.SINGLE, size: 1 },
+//                           right: { style: BorderStyle.SINGLE, size: 1 },
+//                         },
+//                         margins: {
+//                           top: 50,
+//                           bottom: 50,
+//                           left: 75,
+//                           right: 75,
+//                         },
+//                       }),
+//                       new TableCell({
+//                         children: [new Paragraph({
+//                           children: [new TextRun({
+//                             text: item.subname,
+//                             size: 24,
+//                           })],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         })],
+//                         verticalAlign: VerticalAlign.CENTER,
+//                         borders: {
+//                           top: { style: BorderStyle.SINGLE, size: 1 },
+//                           bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                           left: { style: BorderStyle.SINGLE, size: 1 },
+//                           right: { style: BorderStyle.SINGLE, size: 1 },
+//                         },
+//                         margins: {
+//                           top: 50,
+//                           bottom: 50,
+//                           left: 75,
+//                           right: 75,
+//                         },
+//                       }),
+//                       new TableCell({
+//                         children: [new Paragraph({
+//                           children: [new TextRun({
+//                             text: item.percentile.toString(),
+//                             size: 24,
+//                           })],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         })],
+//                         verticalAlign: VerticalAlign.CENTER,
+//                         borders: {
+//                           top: { style: BorderStyle.SINGLE, size: 1 },
+//                           bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                           left: { style: BorderStyle.SINGLE, size: 1 },
+//                           right: { style: BorderStyle.SINGLE, size: 1 },
+//                         },
+//                         margins: {
+//                           top: 50,
+//                           bottom: 50,
+//                           left: 75,
+//                           right: 75,
+//                         },
+//                       }),
+//                     ],
+//                   })
+//                 ),
+//               ],
+//             }),
+//           ],
+//         },
+//       ],
+//     });
+
+//     const buffer = await Packer.toBuffer(doc);
+
+//     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+//     const filename = `Report-${i}-${j}_${sec}_${timestamp}.docx`;
+//     const docFilePath = path.join(__dirname, 'tmp', filename);
+//     fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
+
+//     fs.writeFileSync(docFilePath, buffer);
+
+//     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+//     res.sendFile(docFilePath, (err) => {
+//       if (err) {
+//         console.error('Error sending file:', err);
+//         res.status(500).send('Internal Server Error');
+//       } else {
+//         fs.unlinkSync(docFilePath);
+//       }
+//     });
+
+//     return { path: docFilePath, timestamp };
+//   } catch (error) {
+//     console.error('Error fetching data or generating document:', error);
+//     res.status(500).send('Internal Server Error');
+//   }
+// }
+
+
+export async function downloadReport(req: Request, res: Response) {
   const { sem, sec, batch, count } = req.query;
 
-  if (!sem || !sec || !batch || !count ) {
-    return res.status(400).send('Semester and Section are required.');
+  if (!sem || !batch || !count) {
+    return res.status(400).send("Semester, Batch, and Count are required.");
   }
 
   try {
-    
+    const secCondition = sec ? `AND sec = '${sec}'` : "";
     const result: any = await dbQuery(
-      `SELECT facName,  subjects.subname, sec, sem, batch, percentile FROM report${count} JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' AND batch = ${batch} and TRIM(subjects.subcode) = TRIM(report${count}.subcode);`,
+      `SELECT facName, subjects.subname, sec, sem, batch, percentile 
+       FROM report${count} 
+       JOIN subjects 
+       WHERE sem = ${sem} AND batch = ${batch} ${secCondition} 
+       AND TRIM(subjects.subcode) = TRIM(report${count}.subcode)
+       ORDER BY sec;`
     );
+
     let i: number = Math.floor(Number(sem) / 2);
-    let j: string = (Number(sem) % 2 !== 0) ? "I" : "II";
+    let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
     const report: Report[] = result;
 
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
+    const sections: ISectionOptions[] = (sec
+      ? [{ sec: sec as string, reportData: report }]
+      : Array.from(new Set(report.map((item) => item.sec))).map((section) => ({
+        sec: section,
+        reportData: report.filter((item) => item.sec === section),
+      }))
+    ).map((sectionData) => ({
+      properties: {
+        type: SectionType.NEXT_PAGE, // Start a new section on the next page
+      },
+      children: [
+        // Document Header
+        new Paragraph({
           children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Geethanjali College of Engineering and Technology",
-                  font: {
-                    name: "Old English Text MT",
-                  },
-                  size: 42,
-                  bold: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 50 },
+            new TextRun({
+              text: "Geethanjali College of Engineering and Technology",
+              font: "Old English Text MT",
+              size: 42,
+              bold: true,
             }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+              font: "Times New Roman",
+              size: 30,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Department of Computer Science and Engineering`,
+              font: "Times New Roman",
+              size: 30,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
 
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 22,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 50 },
-            }),
+        // Section Header
+        new Paragraph({
+          text: `Section: ${i}-${sectionData.sec}`,
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 500 },
+        }),
 
-            new Paragraph({
+        // Table with Data
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Table Headers
+            new TableRow({
               children: [
-                new TextRun({
-                  text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 22,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
-            }),
-
-            // Feedback Report Heading
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 30,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 100 },
-            }),
-
-            // Department Heading
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Department of Computer Science and Engineering`,
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 30,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
-            }),
-
-            new Paragraph({
-              text: `Section: ${i}-${sec}`,
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 500 },
-            }),
-            new Table({
-              width: {
-                size: 100,
-                type: WidthType.PERCENTAGE,
-              },
-              rows: [
-                new TableRow({
+                new TableCell({
                   children: [
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "S.No",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "Faculty Name",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "Subject Name",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "Percentile",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
                   ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
                 }),
-                ...report.map((item, index) =>
-                  new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: (index + 1).toString()+'.',
-                            size: 24,
-                            bold: true,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        shading: { fill: "ADD8E6" },
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.facName,
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.subname,
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.percentile.toString(),
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                    ],
-                  })
-                ),
               ],
             }),
+            // Table Rows
+            ...sectionData.reportData.map((item, index) =>
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: (index + 1).toString() + ".",
+                            size: 24,
+                            bold: true,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    shading: { fill: "ADD8E6" },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.facName,
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.subname,
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.percentile.toFixed(2),
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                ],
+              })
+            ),
           ],
-        },
+        }),
       ],
+    }));
+
+    const doc = new Document({
+      sections: sections,
     });
 
+    const fileName = path.join(__dirname, `Report-${batch}-${sem}.docx`);
     const buffer = await Packer.toBuffer(doc);
-
-    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    const filename = `Report-${i}-${j}_${sec}_${timestamp}.docx`;
-    const docFilePath = path.join(__dirname, 'tmp', filename);
-    fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
-
-    fs.writeFileSync(docFilePath, buffer);
-
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.sendFile(docFilePath, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        res.status(500).send('Internal Server Error');
-      } else {
-        fs.unlinkSync(docFilePath);
-      }
+    fs.writeFileSync(fileName, buffer);
+    res.download(fileName, `Report-${batch}-${sem}.docx`, () => {
+      fs.unlinkSync(fileName); // Delete the file after sending the response
     });
-
-    return { path: docFilePath, timestamp };
   } catch (error) {
-    console.error('Error fetching data or generating document:', error);
-    res.status(500).send('Internal Server Error');
+    console.error("Error generating report:", error);
+    res.status(500).send("Failed to generate report.");
   }
 }
 
 
-export async function downloadReport2(req: Request, res: Response) {
-  const { sem, sec, batch, count } = req.query;
 
-  if (!sem || !sec || !batch) {
-    return res.status(400).send('Semester and Section are required.');
+// export async function downloadCFReport(req: Request, res: Response) {
+//   const { sem, batch, count } = req.query;
+//   const branch = req.body.branchInToken;
+
+//   if (!sem || !batch || !count) {
+//     return res.status(400).send("Semester, Batch, and Count are required.");
+//   }
+
+//   try {
+//     const result: any = await dbQuery(
+//       `WITH QuestionText AS (
+//                     SELECT 
+//                         'Employability Skills' AS qtext, 0 AS seq
+//                     UNION ALL
+//                     SELECT 
+//                         'Mentoring support', 1
+//                     UNION ALL
+//                     SELECT 
+//                         'Campus Placement Efforts', 2
+//                     UNION ALL
+//                     SELECT 
+//                         'Career and academic guidance', 3
+//                     UNION ALL
+//                     SELECT 
+//                         'Leadership of the college', 4
+//                     UNION ALL
+//                     SELECT 
+//                         'Soft skills and Personality Development', 5
+//                     UNION ALL
+//                     SELECT 
+//                         'Library Facilities', 6
+//                     UNION ALL
+//                     SELECT 
+//                         'Extracurricular activities', 7
+//                     UNION ALL
+//                     SELECT 
+//                         'Co-curricular activities', 8
+//                     UNION ALL
+//                     SELECT 
+//                         'College transport facilities', 9
+//                     UNION ALL
+//                     SELECT 
+//                         'Service in Academic Section', 10
+//                     UNION ALL
+//                     SELECT 
+//                         'Service in Exam Branch', 11
+//                     UNION ALL
+//                     SELECT 
+//                         'Service in Accounts Section', 12
+//                     UNION ALL
+//                     SELECT 
+//                         'Physical Education Facilities', 13
+//                     UNION ALL
+//                     SELECT 
+//                         'Quality of food in Canteen', 14
+//                     UNION ALL
+//                     SELECT 
+//                         'Service in the Canteen', 15
+//                     UNION ALL
+//                     SELECT 
+//                         'Overall opinion of GCET', 16
+//                 )
+//                 SELECT 
+//                     qt.qtext AS question, 
+//                     branch, 
+//                     sem, 
+//                     COUNT(branch) AS count,
+//                     CASE qt.seq
+//                         WHEN 0 THEN AVG(q0)
+//                         WHEN 1 THEN AVG(q1)
+//                         WHEN 2 THEN AVG(q2)
+//                         WHEN 3 THEN AVG(q3)
+//                         WHEN 4 THEN AVG(q4)
+//                         WHEN 5 THEN AVG(q5)
+//                         WHEN 6 THEN AVG(q6)
+//                         WHEN 7 THEN AVG(q7)
+//                         WHEN 8 THEN AVG(q8)
+//                         WHEN 9 THEN AVG(q9)
+//                         WHEN 10 THEN AVG(q10)
+//                         WHEN 11 THEN AVG(q11)
+//                         WHEN 12 THEN AVG(q12)
+//                         WHEN 13 THEN AVG(q13)
+//                         WHEN 14 THEN AVG(q14)
+//                         WHEN 15 THEN AVG(q15)
+//                         WHEN 16 THEN AVG(q16)
+//                     END AS total,
+//                     ROUND(
+//                         CASE 
+//                             WHEN COUNT(branch) > 0 THEN (CASE qt.seq
+//                                 WHEN 0 THEN AVG(q0)
+//                                 WHEN 1 THEN AVG(q1)
+//                                 WHEN 2 THEN AVG(q2)
+//                                 WHEN 3 THEN AVG(q3)
+//                                 WHEN 4 THEN AVG(q4)
+//                                 WHEN 5 THEN AVG(q5)
+//                                 WHEN 6 THEN AVG(q6)
+//                                 WHEN 7 THEN AVG(q7)
+//                                 WHEN 8 THEN AVG(q8)
+//                                 WHEN 9 THEN AVG(q9)
+//                                 WHEN 10 THEN AVG(q10)
+//                                 WHEN 11 THEN AVG(q11)
+//                                 WHEN 12 THEN AVG(q12)
+//                                 WHEN 13 THEN AVG(q13)
+//                                 WHEN 14 THEN AVG(q14)
+//                                 WHEN 15 THEN AVG(q15)
+//                                 WHEN 16 THEN AVG(q16)
+//                             END) / COUNT(branch) * 20
+//                             ELSE 0 
+//                         END,
+//                     3) AS adjusted_total
+//                     FROM cf1
+//                     CROSS JOIN QuestionText qt
+//                     WHERE branch = '${branch}'
+//                     GROUP BY qt.qtext, qt.seq, branch, sem
+//                     ORDER BY branch, qt.seq;
+// `
+//     );
+
+//     let i: number = Math.floor(Number(sem) / 2);
+//     let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+//     const report: Report[] = result;
+
+//     const sections: ISectionOptions[] = (Array.from(new Set(report.map((item) => item.sec))).map((section) => ({
+//           sec: section,
+//           reportData: report.filter((item) => item.sec === section),
+//         }))
+//     ).map((sectionData) => ({
+//       properties: {
+//         type: SectionType.NEXT_PAGE, // Start a new section on the next page
+//       },
+//       children: [
+//         // Document Header
+//         new Paragraph({
+//           children: [
+//             new TextRun({
+//               text: "Geethanjali College of Engineering and Technology",
+//               font: "Old English Text MT",
+//               size: 42,
+//               bold: true,
+//             }),
+//           ],
+//           alignment: AlignmentType.CENTER,
+//           spacing: { after: 50 },
+//         }),
+//         new Paragraph({
+//           children: [
+//             new TextRun({
+//               text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+//               font: "Times New Roman",
+//               size: 22,
+//               bold: true,
+//               italics: true,
+//             }),
+//           ],
+//           alignment: AlignmentType.CENTER,
+//           spacing: { after: 50 },
+//         }),
+//         new Paragraph({
+//           children: [
+//             new TextRun({
+//               text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+//               font: "Times New Roman",
+//               size: 22,
+//               bold: true,
+//               italics: true,
+//             }),
+//           ],
+//           alignment: AlignmentType.CENTER,
+//           spacing: { after: 200 },
+//         }),
+//         new Paragraph({
+//           children: [
+//             new TextRun({
+//               text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+//               font: "Times New Roman",
+//               size: 30,
+//               bold: true,
+//               italics: true,
+//             }),
+//           ],
+//           alignment: AlignmentType.CENTER,
+//           spacing: { after: 100 },
+//         }),
+//         new Paragraph({
+//           children: [
+//             new TextRun({
+//               text: "Department of Computer Science and Engineering",
+//               font: "Times New Roman",
+//               size: 30,
+//               bold: true,
+//               italics: true,
+//             }),
+//           ],
+//           alignment: AlignmentType.CENTER,
+//           spacing: { after: 200 },
+//         }),
+
+//         // Table with Data
+//         new Table({
+//           width: { size: 100, type: WidthType.PERCENTAGE },
+//           rows: [
+//             // Table Headers
+//             new TableRow({
+//               children: [
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: "S.No",
+//                           bold: true,
+//                           size: 25,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 240 },
+//                     }),
+//                   ],
+//                   shading: { fill: "ADD8E6" },
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: "Question",
+//                           bold: true,
+//                           size: 25,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 240 },
+//                     }),
+//                   ],
+//                   shading: { fill: "ADD8E6" },
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: "Percentile",
+//                           bold: true,
+//                           size: 25,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 240 },
+//                     }),
+//                   ],
+//                   shading: { fill: "ADD8E6" },
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//               ],
+//             }),
+//             ...sectionData.reportData.map((data, index) => new TableRow({
+//               children: [
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: (index + 1).toString(),
+//                           size: 20,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 100 },
+//                     }),
+//                   ],
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: data.question || 'N/A',
+//                           size: 20,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 100 },
+//                     }),
+//                   ],
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//                 new TableCell({
+//                   children: [
+//                     new Paragraph({
+//                       children: [
+//                         new TextRun({
+//                           text: data.adjusted_total ? data.adjusted_total.toFixed(2) : '0',
+//                           size: 20,
+//                         }),
+//                       ],
+//                       alignment: AlignmentType.CENTER,
+//                       spacing: { after: 100 },
+//                     }),
+//                   ],
+//                   verticalAlign: VerticalAlign.CENTER,
+//                   borders: {
+//                     top: { style: BorderStyle.SINGLE, size: 1 },
+//                     bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                     left: { style: BorderStyle.SINGLE, size: 1 },
+//                     right: { style: BorderStyle.SINGLE, size: 1 },
+//                   },
+//                   margins: {
+//                     top: 50,
+//                     bottom: 50,
+//                     left: 75,
+//                     right: 75,
+//                   },
+//                 }),
+//               ],
+//             })),
+//           ],
+//         }),
+//       ],
+//     }));
+
+//     const doc = new Document({
+//       sections: sections,
+//     });
+
+//     const buffer = await Packer.toBuffer(doc);
+//     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+//     const filePath = path.join(__dirname, `cfreport_${branch}_${timestamp}.docx`);
+//     fs.writeFileSync(filePath, buffer);
+
+//     res.download(filePath, (err) => {
+//       if (err) {
+//         console.error("Error sending file:", err);
+//         res.status(500).send("Error generating report.");
+//       } else {
+//         fs.unlink(filePath, (unlinkErr) => {
+//           if (unlinkErr) console.error("Error deleting file:", unlinkErr);
+//         });
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error generating report:", error);
+//     res.status(500).send("Error generating report.");
+//   }
+// }
+
+
+
+
+
+async function createChartImage(data: any[], outputPath: string) {
+  const chartJSNodeCanvas = new ChartJSNodeCanvas({
+    width: 1200,
+    height: 1200,
+  });
+
+  const configuration: ChartConfiguration<'bar', number[], string> = {
+    type: 'bar',
+    data: {
+      labels: data.map(item => item.category),
+      datasets: [{
+        label: 'Scores',
+        data: data.map(item => item.value),
+        backgroundColor: data.map(item => item.value >= 70 ? 'green' : 'red'),
+      }],
+    },
+    options: {
+      responsive: false,
+      plugins: {
+        legend: {
+          display: true,
+        },
+      },
+      layout: {
+        padding: {
+          top: 20,
+          bottom: 20,
+          left: 30,
+          right: 30,
+        },
+      },
+      indexAxis: 'y',
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: {
+            stepSize: 50,
+            callback: function(tickValue: number | string) {
+              const value = typeof tickValue === 'number' ? tickValue : parseFloat(tickValue);
+              return value % 50 === 0 ? value.toString() : '';
+            },
+          },
+          suggestedMin: 0,
+          suggestedMax: 100,
+          grid: {
+            drawTicks: false,
+          },
+        },
+        y: {
+          type: 'category',
+          labels: data.map(item => item.category),
+          ticks: {
+            autoSkip: true,
+            maxRotation: 90,
+            minRotation: 45,
+          },
+        },
+      },
+    },
+  };
+
+  const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
+  fs.writeFileSync(outputPath, buffer);
+}
+
+
+export async function downloadCFReport(req: Request, res: Response) {
+  const { sem, batch, count } = req.query;
+  const branch = req.body.branchInToken;
+
+  if (!sem || !batch || !count) {
+    return res.status(400).send("Semester, Batch, and Count are required.");
   }
 
   try {
-   
     const result: any = await dbQuery(
-      `SELECT facName,  subjects.subname, sec, sem, batch, percentile FROM report2 JOIN subjects WHERE sem = ${sem} AND sec = '${sec}' AND batch = ${batch} and TRIM(subjects.subcode) = TRIM(report1.subcode);`,
+      `WITH QuestionText AS (
+                    SELECT 
+                        'Employability Skills' AS qtext, 0 AS seq
+                    UNION ALL
+                    SELECT 
+                        'Mentoring support', 1
+                    UNION ALL
+                    SELECT 
+                        'Campus Placement Efforts', 2
+                    UNION ALL
+                    SELECT 
+                        'Career and academic guidance', 3
+                    UNION ALL
+                    SELECT 
+                        'Leadership of the college', 4
+                    UNION ALL
+                    SELECT 
+                        'Soft skills and Personality Development', 5
+                    UNION ALL
+                    SELECT 
+                        'Library Facilities', 6
+                    UNION ALL
+                    SELECT 
+                        'Extracurricular activities', 7
+                    UNION ALL
+                    SELECT 
+                        'Co-curricular activities', 8
+                    UNION ALL
+                    SELECT 
+                        'College transport facilities', 9
+                    UNION ALL
+                    SELECT 
+                        'Service in Academic Section', 10
+                    UNION ALL
+                    SELECT 
+                        'Service in Exam Branch', 11
+                    UNION ALL
+                    SELECT 
+                        'Service in Accounts Section', 12
+                    UNION ALL
+                    SELECT 
+                        'Physical Education Facilities', 13
+                    UNION ALL
+                    SELECT 
+                        'Quality of food in Canteen', 14
+                    UNION ALL
+                    SELECT 
+                        'Service in the Canteen', 15
+                    UNION ALL
+                    SELECT 
+                        'Overall opinion of GCET', 16
+                )
+                SELECT 
+                    qt.qtext AS question, 
+                    branch, 
+                    sem, 
+                    COUNT(branch) AS count,
+                    CASE qt.seq
+                        WHEN 0 THEN AVG(q0)
+                        WHEN 1 THEN AVG(q1)
+                        WHEN 2 THEN AVG(q2)
+                        WHEN 3 THEN AVG(q3)
+                        WHEN 4 THEN AVG(q4)
+                        WHEN 5 THEN AVG(q5)
+                        WHEN 6 THEN AVG(q6)
+                        WHEN 7 THEN AVG(q7)
+                        WHEN 8 THEN AVG(q8)
+                        WHEN 9 THEN AVG(q9)
+                        WHEN 10 THEN AVG(q10)
+                        WHEN 11 THEN AVG(q11)
+                        WHEN 12 THEN AVG(q12)
+                        WHEN 13 THEN AVG(q13)
+                        WHEN 14 THEN AVG(q14)
+                        WHEN 15 THEN AVG(q15)
+                        WHEN 16 THEN AVG(q16)
+                    END AS total,
+                    ROUND(
+                        CASE 
+                            WHEN COUNT(branch) > 0 THEN (CASE qt.seq
+                                WHEN 0 THEN AVG(q0)
+                                WHEN 1 THEN AVG(q1)
+                                WHEN 2 THEN AVG(q2)
+                                WHEN 3 THEN AVG(q3)
+                                WHEN 4 THEN AVG(q4)
+                                WHEN 5 THEN AVG(q5)
+                                WHEN 6 THEN AVG(q6)
+                                WHEN 7 THEN AVG(q7)
+                                WHEN 8 THEN AVG(q8)
+                                WHEN 9 THEN AVG(q9)
+                                WHEN 10 THEN AVG(q10)
+                                WHEN 11 THEN AVG(q11)
+                                WHEN 12 THEN AVG(q12)
+                                WHEN 13 THEN AVG(q13)
+                                WHEN 14 THEN AVG(q14)
+                                WHEN 15 THEN AVG(q15)
+                                WHEN 16 THEN AVG(q16)
+                            END) / COUNT(branch) * 20
+                            ELSE 0 
+                        END,
+                    3) AS adjusted_total
+                    FROM cf1
+                    CROSS JOIN QuestionText qt
+                    WHERE branch = '${branch}'
+                    GROUP BY qt.qtext, qt.seq, branch, sem
+                    ORDER BY branch, qt.seq; 
+              `
     );
+
+
     let i: number = Math.floor(Number(sem) / 2);
-    let j: string = (Number(sem) % 2 !== 0) ? "I" : "II";
+    let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
     const report: Report[] = result;
 
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
+    // Prepare chart data
+    const chartData = report.map(item => ({
+      category: item.question,
+      value: item.adjusted_total || 0,
+    }));
+
+    const chartImagePath = path.join(__dirname, 'chart.png');
+    await createChartImage(chartData, chartImagePath);
+
+    const sections: ISectionOptions[] = (Array.from(new Set(report.map((item) => item.sec))).map((section) => ({
+      sec: section,
+      reportData: report.filter((item) => item.sec === section),
+    }))
+    ).map((sectionData) => ({
+      properties: {
+        type: SectionType.NEXT_PAGE,
+      },
+      children: [
+        // Document Header
+        new Paragraph({
           children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "Geethanjali College of Engineering and Technology",
-                  font: {
-                    name: "Old English Text MT",
-                  },
-                  size: 42,
-                  bold: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 50 },
+            new TextRun({
+              text: "Geethanjali College of Engineering and Technology",
+              font: "Old English Text MT",
+              size: 42,
+              bold: true,
             }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+              font: "Times New Roman",
+              size: 30,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Department of Computer Science and Engineering",
+              font: "Times New Roman",
+              size: 30,
+              bold: true,
+              italics: true,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+        }),
 
-            new Paragraph({
+        // Table with Data
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Table Headers
+            new TableRow({
               children: [
-                new TextRun({
-                  text: "\n(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 22,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 50 },
-            }),
-
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "\nCheeryal (V), Keesara (M), Medchal Dist-501 301.",
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 22,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
-            }),
-
-            // Feedback Report Heading
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 30,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 100 },
-            }),
-
-            // Department Heading
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `Department of Computer Science and Engineering`,
-                  font: {
-                    name: "Times New Roman",
-                  },
-                  size: 30,
-                  bold: true,
-                  italics: true,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 200 },
-            }),
-
-            new Paragraph({
-              text: `Section: ${i}-${sec}`,
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 500 },
-            }),
-            new Table({
-              width: {
-                size: 100,
-                type: WidthType.PERCENTAGE,
-              },
-              rows: [
-                new TableRow({
+                new TableCell({
                   children: [
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "S.No",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
-                          text: "Faculty Name",
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Question",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
-                          text: "Subject Name",
-                          bold: true,
-                          size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
-                    }),
-                    new TableCell({
-                      children: [new Paragraph({
-                        children: [new TextRun({
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
                           text: "Percentile",
                           bold: true,
                           size: 25,
-                        })],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      })],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
                     }),
                   ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
                 }),
-                ...report.map((item, index) =>
-                  new TableRow({
-                    children: [
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: (index + 1).toString()+'.',
-                            size: 24,
-                            bold: true,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        shading: { fill: "ADD8E6" },
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.facName,
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.subname,
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                      new TableCell({
-                        children: [new Paragraph({
-                          children: [new TextRun({
-                            text: item.percentile.toString(),
-                            size: 24,
-                          })],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        })],
-                        verticalAlign: VerticalAlign.CENTER,
-                        borders: {
-                          top: { style: BorderStyle.SINGLE, size: 1 },
-                          bottom: { style: BorderStyle.SINGLE, size: 1 },
-                          left: { style: BorderStyle.SINGLE, size: 1 },
-                          right: { style: BorderStyle.SINGLE, size: 1 },
-                        },
-                        margins: {
-                          top: 50,
-                          bottom: 50,
-                          left: 75,
-                          right: 75,
-                        },
-                      }),
-                    ],
-                  })
-                ),
+              ],
+            }),
+
+            // Table Data
+            ...sectionData.reportData.map((data, index) => new TableRow({
+              children: [
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: `${index + 1}`,
+                          size: 20,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 100 },
+                    }),
+                  ],
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: data.question || 'N/A',
+                          size: 20,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 100 },
+                    }),
+                  ],
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: data.adjusted_total ? data.adjusted_total.toFixed(2) : '0',
+                          size: 20,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 100 },
+                    }),
+                  ],
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
+              ],
+            })),
+
+            // Add the chart
+            new TableRow({
+              children: [
+                new TableCell({
+                  columnSpan: 3,
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: fs.readFileSync(chartImagePath),
+                          transformation: { width: 800, height: 600 },
+                        }),
+                      ],
+                    }),
+                  ],
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                }),
               ],
             }),
           ],
-        },
+        }),
       ],
+    }));
+
+    const doc = new Document({
+      sections: sections,
     });
 
     const buffer = await Packer.toBuffer(doc);
-
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    const filename = `Report-${i}-${j}_${sec}_${timestamp}.docx`;
-    const docFilePath = path.join(__dirname, 'tmp', filename);
-    fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
+    const filePath = path.join(__dirname, `cfreport_${branch}_${timestamp}.docx`);
+    fs.writeFileSync(filePath, buffer);
 
-    fs.writeFileSync(docFilePath, buffer);
-
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.sendFile(docFilePath, (err) => {
+    res.download(filePath, (err) => {
       if (err) {
-        console.error('Error sending file:', err);
-        res.status(500).send('Internal Server Error');
+        console.error("Error sending file:", err);
+        res.status(500).send("Error generating report.");
       } else {
-        fs.unlinkSync(docFilePath);
+        fs.unlink(filePath, (unlinkErr) => {
+          if (unlinkErr) console.error("Error deleting file:", unlinkErr);
+        });
       }
     });
-
-    return { path: docFilePath, timestamp };
   } catch (error) {
-    console.error('Error fetching data or generating document:', error);
-    res.status(500).send('Internal Server Error');
+    console.error("Error generating report:", error);
+    res.status(500).send("Error generating report.");
   }
 }
