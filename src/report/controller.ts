@@ -81,7 +81,7 @@ export async function report1(req: Request, res: Response) {
             ]);
         }
         //   Lstn70()
-        const details = await dbQuery(`SELECT sem, batch FROM report1 GROUP BY sem, batch;`);
+        const details = await dbQuery(`SELECT sem, batch, sec FROM report1 GROUP BY sem, batch, sec;`);
         return res.json({ done: true, details: details });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -172,7 +172,7 @@ export async function report2(req: Request, res: Response) {
         }
 
         // Lstn70()
-        const details = await dbQuery(`SELECT sem, batch FROM report2 GROUP BY sem, batch;`);
+        const details = await dbQuery(`SELECT sem, batch, sec FROM report2 GROUP BY sem, batch, sec;`);
         return res.json({ done: true, details: details });
     } catch (error) {
         console.error('Error executing query:', error);

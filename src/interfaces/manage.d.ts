@@ -26,6 +26,20 @@ export interface SubNames {
     facName: string;
   }
   
+  export interface detailsProps {
+    sem: number;
+    sec: string;
+  }
+
+  export interface subjectsDetailsProps {
+    subCode: string;
+    subName: string;
+  }
+
+
+export type detailsArr = detailsProps[];
+  
+export type subjectsDetailsArr = subjectsDetailsProps[];
 
 export type questionsTableArr = questionsTableProps[];
 
