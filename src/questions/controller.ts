@@ -1,7 +1,7 @@
 import { Response, Request } from "express";
 import dbQuery from "../services/db";
 import { responses } from "../services/common";
-import { questionsTableArr, subjectTableProps } from "../interfaces/manage";
+import { detailsArr, detailsProps, facultyTableProps, questionsTableArr, subjectsDetailsProps, subjectTableProps } from "../interfaces/manage";
 interface ReportData {
   facID: number;
   facName: string;
@@ -29,7 +29,7 @@ export async function getQuestions(req: Request, res: Response) {
 
 export async function getSubjects(req: Request, res: Response) {
   try {
-    const { username } = req.query;
+    const username = req.body.usernameInToken;
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
     }
@@ -43,13 +43,19 @@ export async function getSubjects(req: Request, res: Response) {
     }
 
     const { sem, sec, branch } = subsresults[0];
-    const query = 
-      `SELECT t1.subcode, subname, t1.facID, qtype, f.facName
-       FROM (SELECT * FROM timetable WHERE sem = TRIM(?) AND sec = TRIM(?) AND branch = TRIM(?)) AS t1
-       INNER JOIN subjects ON TRIM(t1.subcode) = TRIM(subjects.subcode)
-       INNER JOIN faculty f ON TRIM(f.facID) = TRIM(t1.facID);`
-       const subs = await dbQuery(query,  [sem, sec, branch]) as subjectTableProps;
-      return res.json({ sub: subs });
+    const query =
+      `SELECT t1.subcode, subjects.subname, t1.facID, f.facName, subjects.qtype
+      FROM (SELECT * FROM timetable WHERE sem = TRIM(?) AND sec = TRIM(?) AND branch = TRIM(?)) AS t1
+      INNER JOIN subjects ON TRIM(t1.subcode) = TRIM(subjects.subcode)
+      INNER JOIN faculty f ON TRIM(t1.facID) = TRIM(f.facID)
+      UNION
+      SELECT e.subcode, subjects.subname, e.facID, f.facName, subjects.qtype
+      FROM electives e
+      INNER JOIN faculty f ON TRIM(e.facID) = TRIM(f.facID)
+      INNER JOIN subjects ON TRIM(e.subcode) = TRIM(subjects.subcode)
+      WHERE TRIM(e.rollno) = (?);`
+    const subs = await dbQuery(query, [sem, sec, branch, username]) as subjectTableProps;
+    return res.json({ sub: subs });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -118,14 +124,31 @@ async function Lstn70() {
 
 export async function getDetails(req: Request, res: Response) {
   try {
-    const { batch, sem } = req.query
-    const sec = await dbQuery(`SELECT sec FROM report1 where batch=${batch} and sem=${sem} GROUP BY sec`);
-    res.json({ sec: sec });
+    const detail = await dbQuery(`SELECT sem, sec, rollno FROM studentinfo GROUP BY sec, sem, rollno;`) as detailsArr;
+    res.json({ details: detail });
   } catch (error) {
     console.error('Error executing query:', error);
     res.status(500).send('Error executing query');
   }
 }
 
+export async function getElectiveSubjects(req: Request, res: Response) {
+  try {
+    const subdetail = await dbQuery(`SELECT subCode, subName from subjects where def = 'e';`) as subjectsDetailsProps;
+    res.json({ subdetail: subdetail });
+  } catch (error) {
+    console.error('Error executing query:', error);
+    res.status(500).send('Error executing query');
+  }
+}
 
+export async function getFaculty(req: Request, res: Response) {
+  try {
+    const facdetail = await dbQuery(`SELECT * from faculty;`) as facultyTableProps;
+    res.json({ facdetail: facdetail });
+  } catch (error) {
+    console.error('Error executing query:', error);
+    res.status(500).send('Error executing query');
+  }
+}
 
