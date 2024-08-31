@@ -446,17 +446,17 @@ interface Student {
 
 export async function unfilledstudents(req: Request, res: Response) {
   const { sem, sec } = req.query;
-
+  const branch = req.body.branchInToken;
   if (!sem || !sec) {
     return res.status(400).send('Semester and Section are required.');
   }
 
   try {
     const result: any = await dbQuery(
-      `SELECT rollno, name, sec, sem FROM studentinfo WHERE sem = ${sem} AND sec = '${sec}' and token = 'undone'`,
+      `SELECT rollno, name, sec, sem FROM studentinfo WHERE sem = ${sem} AND sec = '${sec}' and token = 'undone' AND branch = '${branch}';`,
     );
-    let i: number = Number(sem) / 2;
-    let j: number = (Number(sem) % 2 != 0) ? 1 : 2;
+    let i: number = Math.floor(Number(sem) / 2);
+    let j: number = (Math.floor(Number(sem) % 2) != 0) ? 1 : 2;
     const students: Student[] = result;
 
     const doc = new Document({
@@ -465,7 +465,7 @@ export async function unfilledstudents(req: Request, res: Response) {
           properties: {},
           children: [
             new Paragraph({
-              text: `Semester: ${i}-${j}`,
+              text: `Semester: ${i + Number(sem) % 2}-${j}`,
               heading: "Heading1",
               alignment: AlignmentType.CENTER,
               spacing: { after: 300 },
@@ -938,6 +938,21 @@ interface Report {
 
 export async function downloadReport(req: Request, res: Response) {
   const { sem, sec, batch, count } = req.query;
+  const branch = req.body.branchInToken;
+
+  const branchName: Record<string, string> = {
+    CSE: "Computer Science and Engineering",
+    ECE: "Electronics and Communication Engineering",
+    IOT: "Internet of Things",
+    IT: "Information Technology",
+    CIVIL: "Civil Engineering",
+    MECH: "Mechanical Engineering",
+    EEE: "Electrical and Electronics Engineering",
+    DS: "Data Science",
+    CS: "Cyber Security",
+  };
+
+  const fullBranchName = branchName[branch];
 
   if (!sem || !batch || !count) {
     return res.status(400).send("Semester, Batch, and Count are required.");
@@ -954,8 +969,17 @@ export async function downloadReport(req: Request, res: Response) {
        ORDER BY sec;`
     );
 
-    let i: number = Math.floor(Number(sem) / 2);
-    let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+    const i: number = Math.floor(Number(sem) / 2);
+    const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+
+    let c = Math.floor(Number(sem) / 2);
+    if (Number(sem) % 2 === 0) {
+      c = c - 1;
+    }
+
+    const a:number = Number(batch) + c;
+    const b:number = (a % 100) + 1;
+
     const report: Report[] = result;
 
     const sections: ISectionOptions[] = (sec
@@ -966,7 +990,7 @@ export async function downloadReport(req: Request, res: Response) {
       }))
     ).map((sectionData) => ({
       properties: {
-        type: SectionType.NEXT_PAGE, // Start a new section on the next page
+        type: SectionType.NEXT_PAGE, 
       },
       children: [
         // Document Header
@@ -1011,7 +1035,7 @@ export async function downloadReport(req: Request, res: Response) {
         new Paragraph({
           children: [
             new TextRun({
-              text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+              text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${count}`,
               font: "Times New Roman",
               size: 30,
               bold: true,
@@ -1024,7 +1048,7 @@ export async function downloadReport(req: Request, res: Response) {
         new Paragraph({
           children: [
             new TextRun({
-              text: `Department of Computer Science and Engineering`,
+              text: `Department of ${fullBranchName}`,
               font: "Times New Roman",
               size: 30,
               bold: true,
@@ -1037,7 +1061,7 @@ export async function downloadReport(req: Request, res: Response) {
 
         // Section Header
         new Paragraph({
-          text: `Section: ${i}-${sectionData.sec}`,
+          text: `Section: ${i+Number(sem)%2}-${sectionData.sec}`,
           heading: HeadingLevel.HEADING_1,
           alignment: AlignmentType.CENTER,
           spacing: { after: 500 },
@@ -1294,10 +1318,11 @@ export async function downloadReport(req: Request, res: Response) {
       sections: sections,
     });
 
-    const fileName = path.join(__dirname, `Report-${batch}-${sem}.docx`);
+    const fileName = path.join(__dirname, `Report-${batch}-${i}-${j}.docx`);
     const buffer = await Packer.toBuffer(doc);
+    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
     fs.writeFileSync(fileName, buffer);
-    res.download(fileName, `Report-${batch}-${sem}.docx`, () => {
+    res.download(fileName, `Report-${batch}-${sem}-${sec}-${timestamp}.docx`, () => {
       fs.unlinkSync(fileName); // Delete the file after sending the response
     });
   } catch (error) {
@@ -1722,7 +1747,7 @@ export async function downloadReport(req: Request, res: Response) {
 
 async function createChartImage(data: any[], outputPath: string) {
   const chartJSNodeCanvas = new ChartJSNodeCanvas({
-    width: 1200,
+    width: 1500,
     height: 1200,
   });
 
@@ -1757,7 +1782,7 @@ async function createChartImage(data: any[], outputPath: string) {
           type: 'linear',
           ticks: {
             stepSize: 50,
-            callback: function(tickValue: number | string) {
+            callback: function (tickValue: number | string) {
               const value = typeof tickValue === 'number' ? tickValue : parseFloat(tickValue);
               return value % 50 === 0 ? value.toString() : '';
             },
@@ -1789,6 +1814,20 @@ async function createChartImage(data: any[], outputPath: string) {
 export async function downloadCFReport(req: Request, res: Response) {
   const { sem, batch, count } = req.query;
   const branch = req.body.branchInToken;
+
+  const branchName: Record<string, string> = {
+    CSE: "Computer Science and Engineering",
+    ECE: "Electronics and Communication Engineering",
+    IOT: "Internet of Things",
+    IT: "Information Technology",
+    CIVIL: "Civil Engineering",
+    MECH: "Mechanical Engineering",
+    EEE: "Electrical and Electronics Engineering",
+    DS: "Data Science",
+    CS: "Cyber Security",
+  };
+
+  const fullBranchName = branchName[branch];
 
   if (!sem || !batch || !count) {
     return res.status(400).send("Semester, Batch, and Count are required.");
@@ -1852,7 +1891,7 @@ export async function downloadCFReport(req: Request, res: Response) {
                     qt.qtext AS question, 
                     branch, 
                     sem, 
-                    COUNT(branch) AS count,
+                    COUNT(*) AS count,
                     CASE qt.seq
                         WHEN 0 THEN AVG(q0)
                         WHEN 1 THEN AVG(q1)
@@ -1874,7 +1913,7 @@ export async function downloadCFReport(req: Request, res: Response) {
                     END AS total,
                     ROUND(
                         CASE 
-                            WHEN COUNT(branch) > 0 THEN (CASE qt.seq
+                            WHEN COUNT(*) > 0 THEN (CASE qt.seq
                                 WHEN 0 THEN AVG(q0)
                                 WHEN 1 THEN AVG(q1)
                                 WHEN 2 THEN AVG(q2)
@@ -1892,14 +1931,14 @@ export async function downloadCFReport(req: Request, res: Response) {
                                 WHEN 14 THEN AVG(q14)
                                 WHEN 15 THEN AVG(q15)
                                 WHEN 16 THEN AVG(q16)
-                            END) / COUNT(branch) * 20
+                            END) * 20
                             ELSE 0 
                         END,
                     3) AS adjusted_total
                     FROM cf1
                     CROSS JOIN QuestionText qt
-                    WHERE branch = '${branch}'
-                    GROUP BY qt.qtext, qt.seq, branch, sem
+                    WHERE branch = '${branch}' AND sem = ${sem} AND batch = ${batch}
+                    GROUP BY qt.qtext, qt.seq, branch, sem, batch
                     ORDER BY branch, qt.seq; 
               `
     );
@@ -1915,7 +1954,7 @@ export async function downloadCFReport(req: Request, res: Response) {
       value: item.adjusted_total || 0,
     }));
 
-    const chartImagePath = path.join(__dirname, 'chart.png');
+    const chartImagePath = path.join(__dirname, 'tmp', 'chart.png');
     await createChartImage(chartData, chartImagePath);
 
     const sections: ISectionOptions[] = (Array.from(new Set(report.map((item) => item.sec))).map((section) => ({
@@ -1982,7 +2021,7 @@ export async function downloadCFReport(req: Request, res: Response) {
         new Paragraph({
           children: [
             new TextRun({
-              text: "Department of Computer Science and Engineering",
+              text: `Department of ${fullBranchName} `,
               font: "Times New Roman",
               size: 30,
               bold: true,

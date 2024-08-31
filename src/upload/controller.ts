@@ -46,7 +46,7 @@ function processCSVFaculty(data: string) {
     .map((row) => `(${row.join(",")})`);
 }
 
-function processCSVSubjects(data: string, subtype: string) {
+function processCSVSubjects(data: string, subtype: string, def: string) {
   return data
     .trim()
     .split("\n")
@@ -55,7 +55,7 @@ function processCSVSubjects(data: string, subtype: string) {
         .trim()
         .split(",")
         .map((cell) => (cell ? `'${cell}'` : "NULL"))
-        .concat(`'${subtype}'`)
+        .concat(`'${subtype}', '${def}'`)
     )
     .map((row) => `(${row.join(",")})`);
 }
@@ -74,7 +74,7 @@ function processCSVTimeTable(data: string, branch: string) {
     )
     .map((row) => `(${row.join(",")})`);
 }
-export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string, batch: string) {
+export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string, batch: string, def: string) {
   try {
     const workbook = xlsx.readFile(location);
     const sheetName = workbook.SheetNames[0];
@@ -101,7 +101,7 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
         return responses.DoneMSG;
       }
       else if (tableName === "subjects") {
-        const rows = processCSVSubjects(data, subtype);
+        const rows = processCSVSubjects(data, subtype, def);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
@@ -138,6 +138,7 @@ export const  uploadFile = async (req: Request, res: Response) => {
     const subtype = req.body.subtype;
     const branch = req.body.branchInToken;
     const batch = req.body.batch;
+    const def = req.body.def;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     if (!files || !files['file'] || files['file'].length === 0) {
@@ -151,7 +152,7 @@ export const  uploadFile = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Unsupported file format' });
     }
 
-    const result = await uploadFromLoc(file.path, `${tableName}`, `${subtype}`, `${branch}`, `${batch}`);
+    const result = await uploadFromLoc(file.path, `${tableName}`, `${subtype}`, `${branch}`, `${batch}`, `${def}`);
     if (result === responses.DoneMSG) {
       return res.json({ done: true });
     } else {

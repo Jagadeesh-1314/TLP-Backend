@@ -51,9 +51,10 @@ export async function term2(req: Request, res: Response) {
 
 export async function promote(req: Request, res: Response) {
   try {
-    const result = dbQuery(` 
+    const branch = req.body.branchInToken;
+    await dbQuery(` 
               DELETE FROM studentinfo
-              WHERE sem = 8;
+              WHERE sem = 8 where branch = ${branch};
 
               UPDATE studentinfo
                  SET sem = CASE 
@@ -65,10 +66,10 @@ export async function promote(req: Request, res: Response) {
                       WHEN sem = 6 THEN 7
                       WHEN sem = 7 THEN 8
                   END
-                WHERE sem BETWEEN 1 AND 7;
+                WHERE sem BETWEEN 1 AND 7 AND branch = ${branch};
 
                 UPDATE studentinfo
-                  SET token = "undone ";
+                  SET token = "undone" where branch = ${branch};
 
                 UPDATE COUNTTERM SET COUNT = 1;
 

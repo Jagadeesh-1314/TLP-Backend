@@ -9,6 +9,7 @@ import token from "./token";
 import term from "./term";
 import report from "./report";
 import score from "./score";
+import electives from "./electives";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use(isAdmin);
 router.use("/", manageRouter);
 router.use("/", report);
 router.use("/", term);
+router.use("/", electives);
 router.use("/", uploadRouter);
 router.use("/", download);
 
