@@ -4,15 +4,16 @@ import dbQuery from "../services/db";
 
 export async function report1(req: Request, res: Response) {
     try {
-
+        const branch = req.body.branchInToken;
         const query = `
-        SELECT COUNT(si.sec) as count, branch, f.facID, ts.subcode, f.facName, si.sec, si.sem, 
-        SUM(ts.score) as totalScore, ts.batch
-        FROM theoryscore1 ts
-        JOIN faculty f ON TRIM(ts.facID) = TRIM(f.facID)
-        JOIN studentinfo si ON ts.rollno = si.rollno AND ts.sem = si.sem
-        GROUP BY ts.facID, ts.subcode, si.sec, ts.batch, si.sem, si.branch;
-      `;
+            SELECT COUNT(*) as count, f.facID, ts.subcode, f.facName, si.sec, si.sem, si.branch,
+            SUM(ts.score) as totalScore, ts.batch
+            FROM theoryscore1 ts
+            JOIN faculty f ON TRIM(ts.facID) = TRIM(f.facID)
+            JOIN studentinfo si ON ts.rollno = si.rollno AND ts.sem = si.sem
+            WHERE si.branch = '${branch}'
+            GROUP BY ts.facID, ts.subcode, si.sec, ts.batch, ts.sem, si.branch;
+        `;
 
         // Execute the query
         const result: any = await dbQuery(query);
@@ -44,19 +45,23 @@ export async function report1(req: Request, res: Response) {
         }
 
         const labquery = `
-        SELECT COUNT(si.sec) as count, branch, f.facID, ls.subcode, f.facName, si.sec, si.sem,
-        SUM(ls.score) as totalScore, ls.batch
-        FROM labscore1 ls 
-        JOIN faculty f ON TRIM(ls.facID) = TRIM(f.facID )
-        JOIN studentinfo si ON ls.rollno = si.rollno AND ls.sem = si.sem
-        GROUP BY ls.subcode, f.facID, si.sec, ls.batch, si.sem, si.branch;
-      `;
+            SELECT COUNT(*) as count, f.facID, ls.subcode, f.facName, si.sec, si.sem, si.branch,
+            SUM(ls.score) as totalScore, ls.batch
+            FROM labscore1 ls
+            JOIN faculty f ON TRIM(ls.facID) = TRIM(f.facID)
+            JOIN studentinfo si ON ls.rollno = si.rollno AND ls.sem = si.sem
+            WHERE si.branch = '${branch}'
+            GROUP BY ls.facID, ls.subcode, si.sec, ls.batch, ls.sem, si.branch;
+        `;
 
         // Execute the query
         const labresult: any = await dbQuery(labquery);
-        if (labresult.length === 0) {
-            return res.json({ done: false, sec: [] });
-        }
+
+        // ============== IF there are no labs but theory subjects ============
+
+        // if (labresult.length === 0) {
+        //     return res.json({ done: false, sec: [] });
+        // }
 
         const labdata = labresult;
 
@@ -92,14 +97,16 @@ export async function report1(req: Request, res: Response) {
 
 export async function report2(req: Request, res: Response) {
     try {
+        const branch = req.body.branchInToken;
         const query = `
-        SELECT COUNT(si.sec) as count, branch, f.facID, ts.subcode, f.facName, si.sec, si.sem, ts.batch,
-        SUM(ts.score) as totalScore
-        FROM theoryscore2 ts 
-        JOIN faculty f ON ts.facID = f.facID 
-        JOIN studentinfo si ON ts.rollno = si.rollno AND ts.sem = si.sem
-        GROUP BY ts.subcode, f.facID, si.sec, ts.batch, si.sem, si.branch;
-      `;
+            SELECT COUNT(*) as count, f.facID, ts.subcode, f.facName, si.sec, si.sem, si.branch,
+            SUM(ts.score) as totalScore, ts.batch
+            FROM theoryscore2 ts
+            JOIN faculty f ON TRIM(ts.facID) = TRIM(f.facID)
+            JOIN studentinfo si ON ts.rollno = si.rollno AND ts.sem = si.sem
+            WHERE si.branch = '${branch}'
+            GROUP BY ts.facID, ts.subcode, si.sec, ts.batch, ts.sem, si.branch;
+        `;
 
         // Execute the query
         const result: any = await dbQuery(query);
@@ -131,13 +138,14 @@ export async function report2(req: Request, res: Response) {
         }
 
         const labquery = `
-        SELECT COUNT(si.sec) as count, branch, f.facID, ls.subcode, f.facName, si.sec, si.sem,
-        SUM(ls.score) as totalScore, ls.batch
-        FROM labscore2 ls 
-        JOIN faculty f ON ls.facID = f.facID 
-        JOIN studentinfo si ON ls.rollno = si.rollno AND ls.sem = si.sem
-        GROUP BY ls.subcode, f.facID, si.sec, ls.batch, si.sem, si.branch;
-      `;
+            SELECT COUNT(*) as count, f.facID, ls.subcode, f.facName, si.sec, si.sem, si.branch,
+            SUM(ls.score) as totalScore, ls.batch
+            FROM labscore2 ls
+            JOIN faculty f ON TRIM(ls.facID) = TRIM(f.facID)
+            JOIN studentinfo si ON ls.rollno = si.rollno AND ls.sem = si.sem
+            WHERE si.branch = '${branch}'
+            GROUP BY ls.facID, ls.subcode, si.sec, ls.batch, ls.sem, si.branch;
+        `;
 
         // Execute the query
         const labresult: any = await dbQuery(labquery);
@@ -190,7 +198,7 @@ export async function cfreport1(req: Request, res: Response) {
                   FROM cf1 cf1
                   JOIN studentinfo si ON cf1.rollno = si.rollno AND cf1.sem = si.sem
                   WHERE cf1.branch = '${branch}'
-                  GROUP BY cf1.branch, cf1.batch;
+                  GROUP BY cf1.branch, cf1.batch, cf1.sem;
       `;
 
         // Execute the query
@@ -217,7 +225,7 @@ export async function cfreport1(req: Request, res: Response) {
                 (totalScore / count) * 20,
             ]);
         }
-        const details = await dbQuery(`SELECT batch, branch, sem FROM cfreport1 WHERE branch='${branch}' GROUP BY batch, branch;`);
+        const details = await dbQuery(`SELECT batch, branch, sem FROM cfreport1 WHERE branch='${branch}' GROUP BY batch, branch, sem;`);
         return res.json({ done: true, details: details });
     } catch (err) {
         console.error("Error while inserting score:", err);
@@ -236,7 +244,7 @@ export async function cfreport2(req: Request, res: Response) {
                   FROM cf2 cf2
                   JOIN studentinfo si ON cf2.rollno = si.rollno AND cf2.sem = si.sem
                   WHERE cf2.branch = '${branch}'
-                  GROUP BY cf2.branch, cf2.batch;
+                  GROUP BY cf2.branch, cf2.batch, cf2.sem;
       `;
 
         // Execute the query
@@ -277,7 +285,6 @@ export async function fetchReport1(req: Request, res: Response) {
         const { batch, sec, sem } = req.query;
         const branch = req.body.branchInToken;
         if (sec?.length === 0) {
-
             const report: any = await dbQuery(`SELECT report1.*, subjects.subname FROM report1 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
             return res.json({ report: report });
         }
@@ -293,7 +300,11 @@ export async function fetchReport2(req: Request, res: Response) {
     try {
         const { batch, sec, sem } = req.query;
         const branch = req.body.branchInToken;
-        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}';`);
+        if (sec?.length === 0) {
+            const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
+            return res.json({ report: report });
+        }
+        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}' ;`);
         return res.json({ report: report });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -305,9 +316,14 @@ export async function fetchReport2(req: Request, res: Response) {
 
 export async function fetchCFReport(req: Request, res: Response) {
     try {
-        const { term, batch, branchInToken: branch } = req.body;
-        const cfreport1: any = await dbQuery(`SELECT *  FROM cfreport${term} where batch=${batch} AND branch='${branch}';`);
-        return res.json({ cfreport: cfreport1 });
+        const { term, batch, branchInToken: branch, sem } = req.body;
+        if (!batch || batch.length === 0) {
+            const details = await dbQuery(`SELECT batch, branch, sem FROM cfreport${term} WHERE branch='${branch}' GROUP BY batch, branch, sem;`);
+            return res.json({ done: true, details: details });
+        } else {
+            const cfreport: any = await dbQuery(`SELECT *  FROM cfreport${term} where batch=${batch} AND branch='${branch}' AND sem = ${sem};`);
+            return res.json({ cfreport: cfreport });
+        }
     } catch (error) {
         console.error('Error executing query:', error);
         res.status(500).send('Error executing query');
@@ -318,7 +334,7 @@ export async function fetchCFReport(req: Request, res: Response) {
 
 export async function CFReportQuestions(req: Request, res: Response) {
     try {
-        const { batch, branchInToken: branch } = req.body;
+        const { batch, term, sem, branchInToken: branch } = req.body;
         const cfreportquestions: any = await dbQuery(`
                             WITH QuestionText AS (
                     SELECT 
@@ -376,7 +392,7 @@ export async function CFReportQuestions(req: Request, res: Response) {
                     qt.qtext AS question, 
                     branch, 
                     sem, 
-                    COUNT(branch) AS count,
+                    COUNT(*) AS count,
                     CASE qt.seq
                         WHEN 0 THEN AVG(q0)
                         WHEN 1 THEN AVG(q1)
@@ -398,7 +414,7 @@ export async function CFReportQuestions(req: Request, res: Response) {
                     END AS total,
                     ROUND(
                         CASE 
-                            WHEN COUNT(branch) > 0 THEN (CASE qt.seq
+                            WHEN COUNT(*) > 0 THEN (CASE qt.seq
                                 WHEN 0 THEN AVG(q0)
                                 WHEN 1 THEN AVG(q1)
                                 WHEN 2 THEN AVG(q2)
@@ -416,13 +432,13 @@ export async function CFReportQuestions(req: Request, res: Response) {
                                 WHEN 14 THEN AVG(q14)
                                 WHEN 15 THEN AVG(q15)
                                 WHEN 16 THEN AVG(q16)
-                            END) / COUNT(branch) * 20
+                            END) * 20
                             ELSE 0 
                         END,
                     3) AS adjusted_total
-                    FROM cf1
+                    FROM cf${term}
                     CROSS JOIN QuestionText qt
-                    WHERE branch = '${branch}'
+                    WHERE branch = '${branch}' AND batch = ${batch} AND sem = ${sem}
                     GROUP BY qt.qtext, qt.seq, branch, sem
                     ORDER BY branch, qt.seq;
 

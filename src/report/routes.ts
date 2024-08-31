@@ -12,7 +12,7 @@ router.get("/cfreport2", cfreport2);
 router.get("/fetchreport1", fetchReport1);
 router.get("/fetchreport2", fetchReport2);
 router.post("/fetchcfreport", fetchCFReport);
-router.get("/cfreportquestions", CFReportQuestions);
+router.post("/cfreportquestions", CFReportQuestions);
 
 export default router;
 

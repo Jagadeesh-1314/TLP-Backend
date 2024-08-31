@@ -66,7 +66,8 @@ export async function getSubjects(req: Request, res: Response) {
 
 export async function unfilledstudents(req: Request, res: Response) {
   try {
-    const unfilledstudents = await dbQuery(`SELECT rollno, name, sec, sem FROM STUDENTINFO WHERE TOKEN = 'UNDONE';`);
+    const branch = req.body.branchInToken;
+    const unfilledstudents = await dbQuery(`SELECT rollno, name, sec, sem FROM STUDENTINFO WHERE TOKEN = 'UNDONE' AND branch = '${branch}';`);
     return res.json({ done: true, unfilledstudents: unfilledstudents });
 
   } catch (err) {
@@ -117,38 +118,3 @@ async function Lstn70() {
     console.log(e);
   }
 }
-
-
-
-
-
-export async function getDetails(req: Request, res: Response) {
-  try {
-    const detail = await dbQuery(`SELECT sem, sec, rollno FROM studentinfo GROUP BY sec, sem, rollno;`) as detailsArr;
-    res.json({ details: detail });
-  } catch (error) {
-    console.error('Error executing query:', error);
-    res.status(500).send('Error executing query');
-  }
-}
-
-export async function getElectiveSubjects(req: Request, res: Response) {
-  try {
-    const subdetail = await dbQuery(`SELECT subCode, subName from subjects where def = 'e';`) as subjectsDetailsProps;
-    res.json({ subdetail: subdetail });
-  } catch (error) {
-    console.error('Error executing query:', error);
-    res.status(500).send('Error executing query');
-  }
-}
-
-export async function getFaculty(req: Request, res: Response) {
-  try {
-    const facdetail = await dbQuery(`SELECT * from faculty;`) as facultyTableProps;
-    res.json({ facdetail: facdetail });
-  } catch (error) {
-    console.error('Error executing query:', error);
-    res.status(500).send('Error executing query');
-  }
-}
-
