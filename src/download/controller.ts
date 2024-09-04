@@ -14,7 +14,7 @@ import { AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow,
 
 type tableNames =
   | "faculty"
-  | "report"
+  | "report1"
   | "theoryscore1"
   | "labscore"
   | "studentinfo"
@@ -300,7 +300,7 @@ async function downloadTable(
   if (result.length <= 0) return res.json({ error: "No data found" });
 
   let out;
-  if (tableName === "report") {
+  if (tableName === "report1") {
     out = await convertToDOCX(result, fields, tableName);
   } else {
     out = convertToXLSX(result, fields, tableName);
@@ -314,7 +314,7 @@ async function downloadTable(
   let timestamp = out.timestamp;
   fileNamePrefix += '_';
   fileNamePrefix += timestamp;
-  const downloadFileName = `${fileNamePrefix}.${tableName === "report" ? "docx" : "xlsx"}`;
+  const downloadFileName = `${fileNamePrefix}.${tableName === "report1" ? "docx" : "xlsx"}`;
 
   res.download(fileName, downloadFileName, (err) => {
     if (err) {
@@ -358,8 +358,8 @@ const tables: {
     ordering: " ORDER BY seq ",
     fileName: "Questions_info",
   },
-  report: {
-    query: ` SELECT sec, facName as Faculty_Name, subjects.subcode as Subject_Code, subjects.subName as Subject_Name, percentile as Percentile FROM report JOIN subjects where TRIM(subjects.subcode) = TRIM(report.subcode)`,
+  report1: {
+    query: `SELECT sec, facName as Faculty_Name, subjects.subcode as Subject_Code, subjects.subName as Subject_Name, percentile as Percentile FROM report1 JOIN subjects where TRIM(subjects.subcode) = TRIM(report1.subcode)`,
     ordering: " ORDER BY sec ",
     fileName: "report",
   },
@@ -1323,7 +1323,7 @@ export async function downloadReport(req: Request, res: Response) {
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
     fs.writeFileSync(fileName, buffer);
     res.download(fileName, `Report-${batch}-${sem}-${sec}-${timestamp}.docx`, () => {
-      fs.unlinkSync(fileName); // Delete the file after sending the response
+      fs.unlinkSync(fileName); 
     });
   } catch (error) {
     console.error("Error generating report:", error);
