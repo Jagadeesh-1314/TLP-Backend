@@ -1,14 +1,10 @@
 import * as xlsx from "xlsx";
 import { Request, Response } from "express";
 import path from "path";
-import { promises as fs } from "fs";
-import multer from "multer";
 
 import dbQuery from "../services/db";
 import * as logger from "../services/logger";
-import { isAnyUndefined, responses } from "../services/common";
-import md5 from "md5";
-import { Console } from "console";
+import { responses } from "../services/common";
 
 const supportedExtensions = [".xlsx", ".csv"];
 const tables = [
