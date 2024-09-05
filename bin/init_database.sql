@@ -232,6 +232,14 @@ CREATE TABLE report2 (
     PRIMARY KEY (facID, subcode, sec, sem, batch)
 );
 
+CREATE TABLE electives (
+    rollno  VARCHAR(15) NOT NULL,
+    facID   VARCHAR(15) NOT NULL,
+    subcode VARCHAR(15) NOT NULL,
+    PRIMARY KEY (rollno, subcode)
+);
+
+
 
 INSERT INTO users VALUES ("admin", "2d207f75d95007876a8a2971928102c1", "AD", "admin", '');
 
