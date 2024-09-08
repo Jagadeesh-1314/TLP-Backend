@@ -36,6 +36,10 @@ export async function getDetails(req: Request, res: Response) {
   export async function postElectivesDetails(req: Request, res: Response) {
     try {
       const { facID, subCode, rollNumbers } = req.body;
+      if (!facID || !subCode || !rollNumbers){
+        res.json({ done: false })
+        return;
+      }
       const query = `INSERT INTO ELECTIVES VALUES (?, ?, ?);`
       for (const rollno of rollNumbers) {
         await dbQuery(query, [rollno, facID, subCode]);
