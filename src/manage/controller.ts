@@ -16,9 +16,11 @@ export async function getTable(req: Request, res: Response) {
         return;
     }
     try {
-        let timeTable: any = await dbQuery(
-            `SELECT * FROM ${tableName} `
-        );
+      let query = `SELECT * FROM ${tableName}`;
+      if (tableName !== 'faculty' && tableName !== 'subjects') {
+          query += ` WHERE branch = '${req.body.branchInToken}' ORDER BY sem, sec;`;
+      }
+      let timeTable: any = await dbQuery(query);      
         timeTable = JSON.parse(JSON.stringify(timeTable));
         res.json({ tableData: timeTable });
     } catch (err) {

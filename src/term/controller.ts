@@ -60,6 +60,14 @@ export async function promote(req: Request, res: Response) {
       const semesters = result.map((row: { sem: number }) => row.sem);
       return res.json({ done: true, semesters: semesters });
     } else {
+      const nextSem = sem + 1;
+      const checkNextSem: any = await dbQuery(`
+        SELECT COUNT(*) AS count FROM studentinfo 
+        WHERE sem = ${nextSem} AND branch = '${branch}';
+      `);
+      if (checkNextSem[0].count > 0) {
+        return res.json({ done: false });
+      }
       await dbQuery(`
         DELETE FROM studentinfo
         WHERE sem = 8 AND branch = '${branch}';
@@ -71,8 +79,8 @@ export async function promote(req: Request, res: Response) {
         UPDATE studentinfo
         SET token = 'undone' WHERE branch = '${branch}';
 
-        `);
-        // UPDATE COUNTTERM SET COUNT = 1;
+        -- UPDATE COUNTTERM SET COUNT = 1;
+      `);
 
       return res.json({ done: true });
     }
@@ -81,3 +89,4 @@ export async function promote(req: Request, res: Response) {
     res.status(500).send('Error executing query');
   }
 }
+
