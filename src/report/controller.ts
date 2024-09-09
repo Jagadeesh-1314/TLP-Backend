@@ -301,10 +301,10 @@ export async function fetchReport2(req: Request, res: Response) {
         const { batch, sec, sem } = req.query;
         const branch = req.body.branchInToken;
         if (sec?.length === 0) {
-            const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
+            const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
             return res.json({ report: report });
         }
-        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}' ;`);
+        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}' ;`);
         return res.json({ report: report });
     } catch (error) {
         console.error('Error executing query:', error);
