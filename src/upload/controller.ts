@@ -66,7 +66,6 @@ function processCSVSubjects(data: string, subtype: string, def: string) {
         .trim()
         .split(",")
         .map((cell) => (cell ? `'${cell}'` : "NULL"))
-        .concat(`'${subtype}', '${def}'`)
     )
     .map((row) => `(${row.join(",")})`);
 }

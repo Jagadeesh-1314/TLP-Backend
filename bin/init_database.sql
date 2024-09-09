@@ -5,22 +5,23 @@ USE TLP;
 
 
 CREATE TABLE studentinfo (
-    rollno VARCHAR(15) NOT NULL,
-    Name VARCHAR(255) DEFAULT NULL,
-    sec VARCHAR(2) DEFAULT NULL,
-    sem INT DEFAULT NULL,
-    batch INT DEFAULT NULL,
-    token VARCHAR(10) DEFAULT NULL,
-    password VARCHAR(255) DEFAULT NULL,
-    branch VARCHAR(10) DEFAULT NULL,
-    PRIMARY KEY (rollno)
+    rollno VARCHAR(15) NOT NULL PRIMARY KEY,
+    Name VARCHAR(255) NULL,
+    sec VARCHAR(2) NULL,
+    sem INT NULL,
+    branch VARCHAR(10) NULL,
+    batch INT NULL,
+    token ENUM('facdone', 'undone', 'done') NULL,
+    password VARCHAR(255) NULL
 );
+
 
 
 CREATE TABLE subjects (
     subCode VARCHAR(25) NOT NULL,
     subName VARCHAR(255) DEFAULT NULL,
     qtype VARCHAR(10) DEFAULT NULL,
+    def VARCHAR(5) DEFAULT NULL,
     PRIMARY KEY (subCode)
 );
 
