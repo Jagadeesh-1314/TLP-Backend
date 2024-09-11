@@ -5,8 +5,15 @@ import * as config from "../config-local";
 import * as logger from "./services/logger";
 import coreRouter from "./coreRouter";
 import cookieParser from "cookie-parser";
+import slowDown from "express-slow-down";
 
 const app: Express = express();
+
+const speedLimiter = slowDown({
+  windowMs: 15 * 60 * 1000,
+  delayAfter: 1,
+  delayMs: () => 1000,
+});
 
 app.use(express.json());
 app.use(cors());
