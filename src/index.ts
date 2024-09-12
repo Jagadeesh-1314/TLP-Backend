@@ -15,6 +15,7 @@ const speedLimiter = slowDown({
   delayMs: () => 1000,
 });
 
+app.use(speedLimiter);
 app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
