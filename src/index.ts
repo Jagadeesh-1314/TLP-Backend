@@ -15,12 +15,14 @@ const speedLimiter = slowDown({
   delayMs: () => 1000,
 });
 
+app.set('trust proxy', 1);
 app.use(speedLimiter);
 app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
 
 app.use("/api", coreRouter);
+
 
 // Starting the server
 const server = app.listen(config.port, () => {
