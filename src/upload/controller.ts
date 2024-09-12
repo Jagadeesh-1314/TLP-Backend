@@ -24,7 +24,7 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .trim()
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
-          .map((cell) => (cell ? `'${cell}'` : "NULL"))
+          .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
           .concat( `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`)
       )
       .map((row) => `(${row.join(",")})`);
@@ -37,7 +37,7 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .trim()
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
-          .map((cell) => (cell ? `'${cell}'` : "NULL"))
+          .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
           .concat(`'${branch}'`, `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`)
       )
       .map((row) => `(${row.join(",")})`);
@@ -52,7 +52,7 @@ function processCSVFaculty(data: string) {
       row
         .trim()
         .split(",")
-        .map((cell) => (cell ? `'${cell}'` : "NULL"))
+        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
     )
     .map((row) => `(${row.join(",")})`);
 }
@@ -65,7 +65,7 @@ function processCSVSubjects(data: string, subtype: string, def: string) {
       row
         .trim()
         .split(",")
-        .map((cell) => (cell ? `'${cell}'` : "NULL"))
+        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
     )
     .map((row) => `(${row.join(",")})`);
 }
@@ -79,7 +79,7 @@ function processCSVTimeTable(data: string, branch: string) {
       row
         .trim()
         .split(",")
-        .map((cell) => (cell ? `'${cell}'` : "NULL"))
+        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
         .concat(`'${branch}'`)
     )
     .map((row) => `(${row.join(",")})`);

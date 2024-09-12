@@ -20,3 +20,5 @@ export const dbConfig: ConnectionConfig = {
     database: process.env.DB_NAME,
     multipleStatements: true
 }
+
+export const rateLimitOn = process.env.RATE_LIMIT || false;
