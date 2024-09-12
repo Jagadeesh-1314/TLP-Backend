@@ -8,7 +8,7 @@ const router: Router = Router();
 // Defining the core path from which this module should be accessed
 const limiter = rateLimit({
     windowMs: 20 * 60 * 1000,
-    max: 10,
+    max: 20,
 });
 
 // Registering all the login module routes
