@@ -113,7 +113,8 @@ export async function isUserValid(req: Request, res: Response) {
       desg: designation,
       branch: result[0]["branch"],
       batch: result[0]["batch"],
-      sem: result[0]["sem"]
+      sem: result[0]["sem"],
+      token: generateToken(username, result[0]["branch"], result[0]["sem"]),
     });
   } catch (err) {
     logger.log("error", err);
