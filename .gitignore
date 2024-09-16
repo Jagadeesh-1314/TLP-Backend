@@ -19,7 +19,7 @@
 # log
 /log
 /backup
-/tmp
+/src/download/tmp
 
 # misc
 .DS_Store

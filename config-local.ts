@@ -11,7 +11,7 @@ export const infoLogFilePath = path.join(__dirname, "log", process.env.LOG_FILE 
 export const logInConsole = process.env.CONSOLE_LOG || true
 export const logInFile = process.env.FILE_LOG || true
 
-export const secret = (env === "dev")?"$uper_$e(ret":md5("$uper_$e(ret"+Date.now())
+export const secret = (env === "dev")? "$uper_$e(ret" : md5("$uper_$e(ret"+Date.now())
 
 export const dbConfig: ConnectionConfig = {
     user: process.env.DB_USER,

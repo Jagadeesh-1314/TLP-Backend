@@ -10,6 +10,7 @@ import term from "./term";
 import report from "./report";
 import score from "./score";
 import electives from "./electives";
+import statuslist from "./statuslist";
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.use("/", score);
 
 router.use(isAdmin);  
 router.use("/", manageRouter);
+router.use("/", statuslist);
 router.use("/", report);
 router.use("/", term);
 router.use("/", electives);

@@ -2,35 +2,6 @@ import { Response, Request } from "express";
 import dbQuery from "../services/db";
 
 
-export async function updateTokendone(req: Request, res: Response) {
-    const rollno = req.body.usernameInToken;
-    try {
-        if (!rollno)
-            return res.status(400).json({ error: "Missing required field: rollno" });
-
-        const query = `UPDATE studentinfo SET token = 'done' WHERE rollno = '${rollno}';`
-        await dbQuery(query);
-        return res.json({ done: true });
-    } catch (e) {
-        console.log(e);
-    }
-}
-
-export async function updateTokenFacDone(req: Request, res: Response) {
-    const rollno = req.body.usernameInToken;
-    try {
-        if (!rollno)
-            return res.status(400).json({ error: "Missing required field: rollno" });
-
-        const query = `UPDATE studentinfo SET token = 'facdone' WHERE rollno = '${rollno}';`
-        await dbQuery(query);
-        return res.json({ done: true });
-    } catch (e) {
-        console.log(e);
-    }
-}
-
-
 export async function token(req: Request, res: Response) {
     const rollno = req.body.usernameInToken;
     try {
@@ -47,4 +18,4 @@ export async function token(req: Request, res: Response) {
         console.error("Error token:", err);
         return res.status(500).json({ error: "Internal Server Error" });
     }
-}
+}  

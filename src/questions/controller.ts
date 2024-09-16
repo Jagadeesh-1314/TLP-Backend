@@ -53,7 +53,7 @@ export async function getSubjects(req: Request, res: Response) {
       FROM electives e
       INNER JOIN faculty f ON TRIM(e.facID) = TRIM(f.facID)
       INNER JOIN subjects ON TRIM(e.subcode) = TRIM(subjects.subcode)
-      WHERE TRIM(e.rollno) = (?);`
+      WHERE TRIM(e.rollno) = TRIM(?) ORDER BY subcode;`
     const subs = await dbQuery(query, [sem, sec, branch, username]) as subjectTableProps;
     return res.json({ sub: subs });
   } catch (err) {
@@ -62,40 +62,6 @@ export async function getSubjects(req: Request, res: Response) {
   }
 }
 
-
-
-export async function unfilledstudents(req: Request, res: Response) {
-  try {
-    const branch = req.body.branchInToken;
-    const unfilledstudents = await dbQuery(`SELECT rollno, name, sec, sem FROM STUDENTINFO WHERE TOKEN = 'UNDONE' AND branch = '${branch}';`);
-    return res.json({ done: true, unfilledstudents: unfilledstudents });
-
-  } catch (err) {
-    console.error("Error updating token:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-}
-
-
-export async function donestudents(req: Request, res: Response) {
-  try {
-    const branch = req.body.branchInToken;
-    const { batch, sec, sem, term } = req.query;
-    const donestudents: any = await dbQuery(`SELECT COUNT(DISTINCT ts.rollno) AS count
-          FROM theoryscore${term} ts
-          JOIN STUDENTINFO si ON ts.rollno = si.rollno
-          WHERE si.branch = '${branch}'
-            AND ts.batch = ${batch}
-            AND ts.sem = ${sem}
-            AND si.sec = '${sec}';
-      `);
-    const donetotstudents: any = await dbQuery(`SELECT count(*) as count FROM STUDENTINFO WHERE branch = '${branch}' AND batch=${batch} AND sec='${sec}';`);
-    return res.json({ done: true, donestds: donestudents[0].count, donetotstds: donetotstudents[0].count });
-  } catch (err) {
-    console.error("Error updating token:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-}
 
 
 
