@@ -449,3 +449,93 @@ export async function CFReportQuestions(req: Request, res: Response) {
         res.status(500).send('Error executing query');
     }
 }
+
+
+
+export async function ReportQuestions(req: Request, res: Response) {
+    try {
+        const { term, sem, sec, facID, subcode, batch, branchInToken: branch } = req.body;
+        const reportquestions: any = await dbQuery(`
+                            WITH QuestionText AS (
+                        SELECT 
+                            'Passion and enthusiasm to teach' AS qtext, 1 AS seq
+                        UNION ALL
+                        SELECT 
+                            'Subject knowledge', 2
+                        UNION ALL
+                        SELECT 
+                            'Clarity and emphasis on concepts', 3
+                        UNION ALL
+                        SELECT 
+                            'Motivate the student to explore the concepts in depth on his/her own', 4
+                        UNION ALL
+                        SELECT 
+                            'Creating interest in the subject', 5
+                        UNION ALL
+                        SELECT 
+                            'Quality of illustrative visuals, examples and applications', 6
+                        UNION ALL
+                        SELECT 
+                            'Regularity, punctuality & uniform coverage of syllabus', 7
+                        UNION ALL
+                        SELECT 
+                            'Discipline and control over the class', 8
+                        UNION ALL
+                        SELECT 
+                            'Promoting student thinking', 9
+                        UNION ALL
+                        SELECT 
+                            'Encouraging student effort & inviting student interaction', 10
+                    )
+                    SELECT 
+                        qt.qtext AS question, 
+                        si.branch, 
+                        ts.sem, 
+                        COUNT(si.sec) AS count,
+                        CASE qt.seq
+                            WHEN 1 THEN AVG(ts.q1)
+                            WHEN 2 THEN AVG(ts.q2)
+                            WHEN 3 THEN AVG(ts.q3)
+                            WHEN 4 THEN AVG(ts.q4)
+                            WHEN 5 THEN AVG(ts.q5)
+                            WHEN 6 THEN AVG(ts.q6)
+                            WHEN 7 THEN AVG(ts.q7)
+                            WHEN 8 THEN AVG(ts.q8)
+                            WHEN 9 THEN AVG(ts.q9)
+                            WHEN 10 THEN AVG(ts.q10)
+                        END AS total,
+                        ROUND(
+                            CASE 
+                                WHEN COUNT(*) > 0 THEN 
+                                    CASE qt.seq
+                                        WHEN 1 THEN AVG(ts.q1)
+                                        WHEN 2 THEN AVG(ts.q2)
+                                        WHEN 3 THEN AVG(ts.q3)
+                                        WHEN 4 THEN AVG(ts.q4)
+                                        WHEN 5 THEN AVG(ts.q5)
+                                        WHEN 6 THEN AVG(ts.q6)
+                                        WHEN 7 THEN AVG(ts.q7)
+                                        WHEN 8 THEN AVG(ts.q8)
+                                        WHEN 9 THEN AVG(ts.q9)
+                                        WHEN 10 THEN AVG(ts.q10)
+                                    END * 20
+                                ELSE 0 
+                            END, 3) AS adjusted_total
+                    FROM theoryscore${term} ts
+                    JOIN studentinfo si ON ts.rollno = si.rollno
+                    CROSS JOIN QuestionText qt
+                    WHERE si.branch = '${branch}'
+                    AND ts.sem = ${sem}
+                    AND si.sec = '${sec}'
+                    AND ts.facID = '${facID}'
+                    AND ts.subcode = '${subcode}'
+                    AND si.batch = '${batch}'
+                    GROUP BY qt.qtext, qt.seq, si.branch, ts.sem, si.sec
+                    ORDER BY si.branch, qt.seq;
+            `);
+        return res.json({ reportquestions: reportquestions });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        res.status(500).send('Error executing query');
+    }
+}
