@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { cfreport1, cfreport2, CFReportQuestions, fetchCFReport, fetchReport1, fetchReport2, report1, report2 } from './controller';
+import { cfreport1, cfreport2, CFReportQuestions, fetchCFReport, fetchReport1, fetchReport2, report1, report2, ReportQuestions } from './controller';
 
 const router: Router = Router();
 
@@ -13,6 +13,7 @@ router.get("/fetchreport1", fetchReport1);
 router.get("/fetchreport2", fetchReport2);
 router.post("/fetchcfreport", fetchCFReport);
 router.post("/cfreportquestions", CFReportQuestions);
+router.post("/reportquestions", ReportQuestions);
 
 export default router;
 

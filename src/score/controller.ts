@@ -158,7 +158,6 @@ import { subjectTableProps } from "../interfaces/manage";
 //   }
 // }
 
-
 export async function postScore(req: Request, res: Response) {
   try {
     const { scores } = req.body;
@@ -198,9 +197,7 @@ export async function postScore(req: Request, res: Response) {
     const countData: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
     const { count } = countData[0];
 
-    const theoryQueries: string[] = [];
-    const labQueries: string[] = [];
-    const queryParams: any[] = [];
+    const allParamsArray: { query: string, params: any[] }[] = [];
 
     for (let scoreData of scores) {
       const { subCode, score } = scoreData;
@@ -215,39 +212,45 @@ export async function postScore(req: Request, res: Response) {
         return res.status(400).json("Score values must be between 1 and 5");
       }
 
-      // score calculation
       let totalScore: number;
+
+      // Handle theory
       if (qtype === "theory") {
         if (scoreValues.length !== 10) {
           return res.status(400).json({ error: "Theory scores must have 10 values" });
         }
         totalScore = scoreValues.reduce((acc, val) => acc + val, 0) / scoreValues.length;
 
-        theoryQueries.push(`
+        const theoryQuery = `
           INSERT INTO theoryscore${count} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, score, batch)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        queryParams.push([username, facID, subCode, sem, ...scoreValues, totalScore, batch]);
+        `;
+        const queryParams = [username, facID, subCode, sem, ...scoreValues, totalScore, batch];
+
+        allParamsArray.push({ query: theoryQuery, params: queryParams });
 
       } else if (qtype === "lab") {
+        // Handle lab
         if (scoreValues.length !== 8) {
           return res.status(400).json({ error: "Lab scores must have 8 values" });
         }
         totalScore = scoreValues.reduce((acc, val) => acc + val, 0) / scoreValues.length;
 
-        labQueries.push(`
+        const labQuery = `
           INSERT INTO labscore${count} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, score, batch)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        queryParams.push([username, facID, subCode, sem, ...scoreValues, totalScore, batch]);
+        `;
+        const queryParams = [username, facID, subCode, sem, ...scoreValues, totalScore, batch];
+
+        allParamsArray.push({ query: labQuery, params: queryParams });
+
       } else {
         return res.status(400).json({ error: "Invalid qtype" });
       }
     }
-    // console.log(theoryQueries, labQueries);
+    // console.log(allParamsArray.map(({ query, params }) => ({ query, params })));
 
-    const allQueries = [...theoryQueries, ...labQueries];
-    const executeBatch = allQueries.map((query, index) => dbQuery(query, queryParams[index]));
+    const executeBatch = allParamsArray.map(({ query, params }) => dbQuery(query, params));
 
     const results: any = await Promise.all(executeBatch);
     const allProtocol41 = results.every((result: { protocol41: boolean }) => result.protocol41);
@@ -262,8 +265,6 @@ export async function postScore(req: Request, res: Response) {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
-
-
 
 
 export async function cfScore(req: Request, res: Response) {
@@ -300,7 +301,7 @@ export async function cfScore(req: Request, res: Response) {
       await dbQuery(token, [username]);
       return res.json({ done: true });
     }
-    return res.json({ done: false});
+    return res.json({ done: false });
   } catch (err) {
     console.error("Error while inserting score:", err);
     return res.status(500).json({ error: "Internal Server Error" });
