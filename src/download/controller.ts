@@ -955,7 +955,7 @@ async function generateChart(reportData: any[]) {
             percentile > 70 ? 'rgba(2, 97, 250, 0.2)' : 'rgba(255, 99, 132, 0.2)'
           ),
           borderColor: percentiles.map((percentile: number) =>
-            percentile > 70 ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)'
+            percentile > 70 ? 'rgba(2, 97, 250, 1)' : 'rgba(255, 99, 132, 1)'
           ),
           borderWidth: 1,
         },
@@ -964,7 +964,24 @@ async function generateChart(reportData: any[]) {
     options: {
       scales: {
         y: {
+          min: 0,
+          max: 100, 
           beginAtZero: true,
+          ticks: {
+            stepSize: 20, 
+            font: {
+              weight: 'bold', 
+            },
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: {
+            font: {
+              weight: 'bold', 
+            },
+          },
         },
       },
     },
@@ -977,411 +994,412 @@ async function generateChart(reportData: any[]) {
 
 
 
-export async function downloadReport(req: Request, res: Response) {
-  const { sem, sec, batch, count } = req.query;
-  const branch = req.body.branchInToken;
 
-  const branchName: Record<string, string> = {
-    CSE: "Computer Science and Engineering",
-    ECE: "Electronics and Communication Engineering",
-    IOT: "Internet of Things",
-    IT: "Information Technology",
-    CIVIL: "Civil Engineering",
-    MECH: "Mechanical Engineering",
-    EEE: "Electrical and Electronics Engineering",
-    DS: "Data Science",
-    CS: "Cyber Security",
-  };
+// export async function downloadReport(req: Request, res: Response) {
+//   const { sem, sec, batch, count } = req.query;
+//   const branch = req.body.branchInToken;
 
-  const fullBranchName = branchName[branch];
+//   const branchName: Record<string, string> = {
+//     CSE: "Computer Science and Engineering",
+//     ECE: "Electronics and Communication Engineering",
+//     IOT: "Internet of Things",
+//     IT: "Information Technology",
+//     CIVIL: "Civil Engineering",
+//     MECH: "Mechanical Engineering",
+//     EEE: "Electrical and Electronics Engineering",
+//     DS: "Data Science",
+//     CS: "Cyber Security",
+//   };
 
-  if (!sem || !batch || !count) {
-    return res.status(400).send("Semester, Batch, and Count are required.");
-  }
+//   const fullBranchName = branchName[branch];
 
-  try {
-    const secCondition = sec ? `AND sec = '${sec}'` : "";
-    const result: any = await dbQuery(
-      `SELECT facName, subjects.subname, sec, sem, batch, percentile 
-       FROM report${count} 
-       JOIN subjects 
-       WHERE sem = ${sem} AND batch = ${batch} ${secCondition} AND branch = '${branch}'
-       AND TRIM(subjects.subcode) = TRIM(report${count}.subcode)
-       ORDER BY sec;`
-    );
+//   if (!sem || !batch || !count) {
+//     return res.status(400).send("Semester, Batch, and Count are required.");
+//   }
 
-    const i: number = Math.floor(Number(sem) / 2);
-    const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+//   try {
+//     const secCondition = sec ? `AND sec = '${sec}'` : "";
+//     const result: any = await dbQuery(
+//       `SELECT facName, subjects.subname, sec, sem, batch, percentile 
+//        FROM report${count} 
+//        JOIN subjects 
+//        WHERE sem = ${sem} AND batch = ${batch} ${secCondition} AND branch = '${branch}'
+//        AND TRIM(subjects.subcode) = TRIM(report${count}.subcode)
+//        ORDER BY sec;`
+//     );
 
-    let c = Math.floor(Number(sem) / 2);
-    if (Number(sem) % 2 === 0) {
-      c = c - 1;
-    }
+//     const i: number = Math.floor(Number(sem) / 2);
+//     const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
 
-    const a:number = Number(batch) + c;
-    const b:number = (a % 100) + 1;
+//     let c = Math.floor(Number(sem) / 2);
+//     if (Number(sem) % 2 === 0) {
+//       c = c - 1;
+//     }
 
-    const report: Report[] = result;
+//     const a:number = Number(batch) + c;
+//     const b:number = (a % 100) + 1;
 
-    const chartImageBuffer = await generateChart(report);
+//     const report: Report[] = result;
 
-    // Convert the chart buffer to a PNG for Word docx compatibility
-    const chartImagePath = path.join(__dirname, 'tmp', 'report.png');
-    await sharp(chartImageBuffer).png().toFile(chartImagePath);
+//     const chartImageBuffer = await generateChart(report);
 
-    const sections: ISectionOptions[] = [
-      {
-        children: [
-          // Document Header
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Geethanjali College of Engineering and Technology",
-                font: "Old English Text MT",
-                size: 42,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 50 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
-                font: "Times New Roman",
-                size: 22,
-                bold: true,
-                italics: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 50 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
-                font: "Times New Roman",
-                size: 22,
-                bold: true,
-                italics: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${count}`,
-                font: "Times New Roman",
-                size: 30,
-                bold: true,
-                italics: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 100 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Department of ${fullBranchName}`,
-                font: "Times New Roman",
-                size: 30,
-                bold: true,
-                italics: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          }),
-          // Section Header
-          new Paragraph({
-            text: `Section: ${i+Number(sem)%2}-${sec}`,
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 500 },
-          }),
-          // Table with Data
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [
-              // Table Headers
-              new TableRow({
-                children: [
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: "S.No",
-                            bold: true,
-                            size: 25,
-                          }),
-                        ],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      }),
-                    ],
-                    shading: { fill: "ADD8E6" },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.SINGLE, size: 1 },
-                      bottom: { style: BorderStyle.SINGLE, size: 1 },
-                      left: { style: BorderStyle.SINGLE, size: 1 },
-                      right: { style: BorderStyle.SINGLE, size: 1 },
-                    },
-                    margins: {
-                      top: 50,
-                      bottom: 50,
-                      left: 75,
-                      right: 75,
-                    },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: "Faculty Name",
-                            bold: true,
-                            size: 25,
-                          }),
-                        ],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      }),
-                    ],
-                    shading: { fill: "ADD8E6" },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.SINGLE, size: 1 },
-                      bottom: { style: BorderStyle.SINGLE, size: 1 },
-                      left: { style: BorderStyle.SINGLE, size: 1 },
-                      right: { style: BorderStyle.SINGLE, size: 1 },
-                    },
-                    margins: {
-                      top: 50,
-                      bottom: 50,
-                      left: 75,
-                      right: 75,
-                    },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: "Subject Name",
-                            bold: true,
-                            size: 25,
-                          }),
-                        ],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      }),
-                    ],
-                    shading: { fill: "ADD8E6" },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.SINGLE, size: 1 },
-                      bottom: { style: BorderStyle.SINGLE, size: 1 },
-                      left: { style: BorderStyle.SINGLE, size: 1 },
-                      right: { style: BorderStyle.SINGLE, size: 1 },
-                    },
-                    margins: {
-                      top: 50,
-                      bottom: 50,
-                      left: 75,
-                      right: 75,
-                    },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: "Percentile",
-                            bold: true,
-                            size: 25,
-                          }),
-                        ],
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 240 },
-                      }),
-                    ],
-                    shading: { fill: "ADD8E6" },
-                    verticalAlign: VerticalAlign.CENTER,
-                    borders: {
-                      top: { style: BorderStyle.SINGLE, size: 1 },
-                      bottom: { style: BorderStyle.SINGLE, size: 1 },
-                      left: { style: BorderStyle.SINGLE, size: 1 },
-                      right: { style: BorderStyle.SINGLE, size: 1 },
-                    },
-                    margins: {
-                      top: 50,
-                      bottom: 50,
-                      left: 75,
-                      right: 75,
-                    },
-                  }),
+//     // Convert the chart buffer to a PNG for Word docx compatibility
+//     const chartImagePath = path.join(__dirname, 'tmp', 'report.png');
+//     await sharp(chartImageBuffer).png().toFile(chartImagePath);
+
+//     const sections: ISectionOptions[] = [
+//       {
+//         children: [
+//           // Document Header
+//           new Paragraph({
+//             children: [
+//               new TextRun({
+//                 text: "Geethanjali College of Engineering and Technology",
+//                 font: "Old English Text MT",
+//                 size: 42,
+//                 bold: true,
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 50 },
+//           }),
+//           new Paragraph({
+//             children: [
+//               new TextRun({
+//                 text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+//                 font: "Times New Roman",
+//                 size: 22,
+//                 bold: true,
+//                 italics: true,
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 50 },
+//           }),
+//           new Paragraph({
+//             children: [
+//               new TextRun({
+//                 text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+//                 font: "Times New Roman",
+//                 size: 22,
+//                 bold: true,
+//                 italics: true,
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 200 },
+//           }),
+//           new Paragraph({
+//             children: [
+//               new TextRun({
+//                 text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${count}`,
+//                 font: "Times New Roman",
+//                 size: 30,
+//                 bold: true,
+//                 italics: true,
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 100 },
+//           }),
+//           new Paragraph({
+//             children: [
+//               new TextRun({
+//                 text: `Department of ${fullBranchName}`,
+//                 font: "Times New Roman",
+//                 size: 30,
+//                 bold: true,
+//                 italics: true,
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 200 },
+//           }),
+//           // Section Header
+//           new Paragraph({
+//             text: `Section: ${i+Number(sem)%2}-${sec}`,
+//             heading: HeadingLevel.HEADING_1,
+//             alignment: AlignmentType.CENTER,
+//             spacing: { after: 500 },
+//           }),
+//           // Table with Data
+//           new Table({
+//             width: { size: 100, type: WidthType.PERCENTAGE },
+//             rows: [
+//               // Table Headers
+//               new TableRow({
+//                 children: [
+//                   new TableCell({
+//                     children: [
+//                       new Paragraph({
+//                         children: [
+//                           new TextRun({
+//                             text: "S.No",
+//                             bold: true,
+//                             size: 25,
+//                           }),
+//                         ],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       }),
+//                     ],
+//                     shading: { fill: "ADD8E6" },
+//                     verticalAlign: VerticalAlign.CENTER,
+//                     borders: {
+//                       top: { style: BorderStyle.SINGLE, size: 1 },
+//                       bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                       left: { style: BorderStyle.SINGLE, size: 1 },
+//                       right: { style: BorderStyle.SINGLE, size: 1 },
+//                     },
+//                     margins: {
+//                       top: 50,
+//                       bottom: 50,
+//                       left: 75,
+//                       right: 75,
+//                     },
+//                   }),
+//                   new TableCell({
+//                     children: [
+//                       new Paragraph({
+//                         children: [
+//                           new TextRun({
+//                             text: "Faculty Name",
+//                             bold: true,
+//                             size: 25,
+//                           }),
+//                         ],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       }),
+//                     ],
+//                     shading: { fill: "ADD8E6" },
+//                     verticalAlign: VerticalAlign.CENTER,
+//                     borders: {
+//                       top: { style: BorderStyle.SINGLE, size: 1 },
+//                       bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                       left: { style: BorderStyle.SINGLE, size: 1 },
+//                       right: { style: BorderStyle.SINGLE, size: 1 },
+//                     },
+//                     margins: {
+//                       top: 50,
+//                       bottom: 50,
+//                       left: 75,
+//                       right: 75,
+//                     },
+//                   }),
+//                   new TableCell({
+//                     children: [
+//                       new Paragraph({
+//                         children: [
+//                           new TextRun({
+//                             text: "Subject Name",
+//                             bold: true,
+//                             size: 25,
+//                           }),
+//                         ],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       }),
+//                     ],
+//                     shading: { fill: "ADD8E6" },
+//                     verticalAlign: VerticalAlign.CENTER,
+//                     borders: {
+//                       top: { style: BorderStyle.SINGLE, size: 1 },
+//                       bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                       left: { style: BorderStyle.SINGLE, size: 1 },
+//                       right: { style: BorderStyle.SINGLE, size: 1 },
+//                     },
+//                     margins: {
+//                       top: 50,
+//                       bottom: 50,
+//                       left: 75,
+//                       right: 75,
+//                     },
+//                   }),
+//                   new TableCell({
+//                     children: [
+//                       new Paragraph({
+//                         children: [
+//                           new TextRun({
+//                             text: "Percentile",
+//                             bold: true,
+//                             size: 25,
+//                           }),
+//                         ],
+//                         alignment: AlignmentType.CENTER,
+//                         spacing: { after: 240 },
+//                       }),
+//                     ],
+//                     shading: { fill: "ADD8E6" },
+//                     verticalAlign: VerticalAlign.CENTER,
+//                     borders: {
+//                       top: { style: BorderStyle.SINGLE, size: 1 },
+//                       bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                       left: { style: BorderStyle.SINGLE, size: 1 },
+//                       right: { style: BorderStyle.SINGLE, size: 1 },
+//                     },
+//                     margins: {
+//                       top: 50,
+//                       bottom: 50,
+//                       left: 75,
+//                       right: 75,
+//                     },
+//                   }),
                   
-                ],
-              }),
-              // Table Rows
-              ...report.map((item, index) =>
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      children: [
-                        new Paragraph({
-                          children: [
-                            new TextRun({
-                              text: (index + 1).toString() + ".",
-                              size: 24,
-                              bold: true,
-                            }),
-                          ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        }),
-                      ],
-                      shading: { fill: "ADD8E6" },
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
-                    }),
-                    new TableCell({
-                      children: [
-                        new Paragraph({
-                          children: [
-                            new TextRun({
-                              text: item.facName,
-                              size: 24,
-                            }),
-                          ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        }),
-                      ],
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
-                    }),
-                    new TableCell({
-                      children: [
-                        new Paragraph({
-                          children: [
-                            new TextRun({
-                              text: item.subname,
-                              size: 24,
-                            }),
-                          ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        }),
-                      ],
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
-                    }),
-                    new TableCell({
-                      children: [
-                        new Paragraph({
-                          children: [
-                            new TextRun({
-                              text: item.percentile.toFixed(2),
-                              size: 24,
-                            }),
-                          ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 240 },
-                        }),
-                      ],
-                      verticalAlign: VerticalAlign.CENTER,
-                      borders: {
-                        top: { style: BorderStyle.SINGLE, size: 1 },
-                        bottom: { style: BorderStyle.SINGLE, size: 1 },
-                        left: { style: BorderStyle.SINGLE, size: 1 },
-                        right: { style: BorderStyle.SINGLE, size: 1 },
-                      },
-                      margins: {
-                        top: 50,
-                        bottom: 50,
-                        left: 75,
-                        right: 75,
-                      },
-                    }),
-                  ],
-                })
-              ),
-            ],
-          }),
-          new Paragraph({
-            children: [
-              new ImageRun({
-                data: chartImageBuffer,  // Insert the chart image
-                transformation: {
-                  width: 600,
-                  height: 300,
-                },
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-          }),
-        ],
-      },
-    ];
+//                 ],
+//               }),
+//               // Table Rows
+//               ...report.map((item, index) =>
+//                 new TableRow({
+//                   children: [
+//                     new TableCell({
+//                       children: [
+//                         new Paragraph({
+//                           children: [
+//                             new TextRun({
+//                               text: (index + 1).toString() + ".",
+//                               size: 24,
+//                               bold: true,
+//                             }),
+//                           ],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         }),
+//                       ],
+//                       shading: { fill: "ADD8E6" },
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [
+//                         new Paragraph({
+//                           children: [
+//                             new TextRun({
+//                               text: item.facName,
+//                               size: 24,
+//                             }),
+//                           ],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         }),
+//                       ],
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [
+//                         new Paragraph({
+//                           children: [
+//                             new TextRun({
+//                               text: item.subname,
+//                               size: 24,
+//                             }),
+//                           ],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         }),
+//                       ],
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                     new TableCell({
+//                       children: [
+//                         new Paragraph({
+//                           children: [
+//                             new TextRun({
+//                               text: item.percentile.toFixed(2),
+//                               size: 24,
+//                             }),
+//                           ],
+//                           alignment: AlignmentType.CENTER,
+//                           spacing: { after: 240 },
+//                         }),
+//                       ],
+//                       verticalAlign: VerticalAlign.CENTER,
+//                       borders: {
+//                         top: { style: BorderStyle.SINGLE, size: 1 },
+//                         bottom: { style: BorderStyle.SINGLE, size: 1 },
+//                         left: { style: BorderStyle.SINGLE, size: 1 },
+//                         right: { style: BorderStyle.SINGLE, size: 1 },
+//                       },
+//                       margins: {
+//                         top: 50,
+//                         bottom: 50,
+//                         left: 75,
+//                         right: 75,
+//                       },
+//                     }),
+//                   ],
+//                 })
+//               ),
+//             ],
+//           }),
+//           new Paragraph({
+//             children: [
+//               new ImageRun({
+//                 data: chartImageBuffer,  // Insert the chart image
+//                 transformation: {
+//                   width: 600,
+//                   height: 300,
+//                 },
+//               }),
+//             ],
+//             alignment: AlignmentType.CENTER,
+//           }),
+//         ],
+//       },
+//     ];
        
 
-    const doc = new Document({
-      sections: sections,
-    });
+//     const doc = new Document({
+//       sections: sections,
+//     });
 
-    const fileName = path.join(__dirname, `Report-${batch}-${i}-${j}.docx`);
-    const buffer = await Packer.toBuffer(doc);
-    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    fs.writeFileSync(fileName, buffer);
-    res.download(fileName, `Report-${batch}-${sem}-${sec}-${timestamp}.docx`, () => {
-      fs.unlinkSync(fileName); 
-    });
-  } catch (error) {
-    console.error("Error generating report:", error);
-    res.status(500).send("Failed to generate report.");
-  }
-}
+//     const fileName = path.join(__dirname, `Report-${batch}-${i}-${j}.docx`);
+//     const buffer = await Packer.toBuffer(doc);
+//     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+//     fs.writeFileSync(fileName, buffer);
+//     res.download(fileName, `Report-${batch}-${sem}-${sec}-${timestamp}.docx`, () => {
+//       fs.unlinkSync(fileName); 
+//     });
+//   } catch (error) {
+//     console.error("Error generating report:", error);
+//     res.status(500).send("Failed to generate report.");
+//   }
+// }
 
 
 
@@ -1794,6 +1812,534 @@ export async function downloadReport(req: Request, res: Response) {
 // }
 
 
+export async function downloadReport(req: Request, res: Response) {
+  const { sem, sec, batch, count } = req.query;
+  const branch = req.body.branchInToken;
+
+  const branchName: Record<string, string> = {
+    CSE: "Computer Science and Engineering",
+    ECE: "Electronics and Communication Engineering",
+    IOT: "Internet of Things",
+    IT: "Information Technology",
+    CIVIL: "Civil Engineering",
+    MECH: "Mechanical Engineering",
+    EEE: "Electrical and Electronics Engineering",
+    DS: "Data Science",
+    CS: "Cyber Security",
+  };
+
+  const fullBranchName = branchName[branch];
+
+  if (!sem || !batch || !count) {
+    return res.status(400).send("Semester, Batch, and Count are required.");
+  }
+
+  try {
+    const secCondition = sec ? `AND sec = '${sec}'` : "";
+    const result: any = await dbQuery(
+      `SELECT facName, subjects.subname, sec, sem, batch, percentile 
+       FROM report${count} 
+       JOIN subjects 
+       ON TRIM(subjects.subcode) = TRIM(report${count}.subcode)
+       WHERE sem = ${sem} AND batch = ${batch} ${secCondition} AND branch = '${branch}'
+       ORDER BY sec;`
+    );
+
+    const i: number = Math.floor(Number(sem) / 2);
+    const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+
+    let c = Math.floor(Number(sem) / 2);
+    if (Number(sem) % 2 === 0) {
+      c = c - 1;
+    }
+
+    const a: number = Number(batch) + c;
+    const b: number = (a % 100) + 1;
+
+    const sectionPromises: Promise<(Paragraph | Table)[]>[] = [...new Set(result.map((row: any) => row.sec))].map(async (section) => {
+      const sectionData = result.filter((row: any) => row.sec === section);
+
+      // Generate chart for the current section
+      const chartImageBuffer = await generateChart(sectionData);
+      const chartImagePath = path.join(__dirname, 'tmp', `report_${section}.png`);
+      await sharp(chartImageBuffer).png().toFile(chartImagePath);
+
+      return [
+        // Section Header
+        new Paragraph({
+          text: `Section: ${i+Number(sem)%2}-${section}`,
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 500 },
+        }),
+        // Table with Data
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Table Headers
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "S.No",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Faculty Name",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Subject Name",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Percentile",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+              ],
+            }),
+            // Table Rows
+            ...sectionData.map((item: { facName: any; subname: any; percentile: { toString: () => any; }; }, index: number) =>
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: (index + 1).toString() + ".",
+                            size: 24,
+                            bold: true,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    shading: { fill: "ADD8E6" },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.facName,
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.subname,
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.percentile.toString(),
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                ],
+              })
+            ),
+          ],
+        }),
+        // Chart Image
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: fs.readFileSync(chartImagePath),
+              transformation: {
+                width: 600,
+                height: 400,
+              },
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 500 },
+        }),
+      ];
+    });
+
+    // Resolve the section promises
+    const resolvedSections = await Promise.all(sectionPromises);
+
+    // Create the Document
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            // Report Header
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Geethanjali College of Engineering and Technology",
+                  font: "Old English Text MT",
+                  size: 42,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${count}`,
+                  font: "Times New Roman",
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 100 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Department of ${fullBranchName}`,
+                  font: "Times New Roman",
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            // Add resolved sections to the document
+            ...resolvedSections.flat(),
+          ],
+        },
+      ],
+    });
+
+    // Generate Document and Save to File
+    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+    const buffer = await Packer.toBuffer(doc);
+    const filePath = path.join(__dirname, 'tmp', `Report_${sem}_${batch}_${count}.docx`);
+    fs.writeFileSync(filePath, buffer);
+
+    // Send File to Client
+    res.download(filePath, `Report-${batch}-${sem}-${sec? sec : `ALL_Sections`}-${timestamp}.docx`, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res.status(500).send("Error generating report.");
+      } else {
+        // Clean up temporary files
+        fs.readdir(path.join(__dirname, 'tmp'), (err, files) => {
+          if (err) throw err;
+          files.forEach(file => {
+            fs.unlink(path.join(__dirname, 'tmp', file), err => {
+              if (err) throw err;
+            });
+          });
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error generating report:", error);
+    res.status(500).send("Error generating report.");
+  }
+}
+
+
+
+// async function createChartImage(data: any[], outputPath: string) {
+//   const chartJSNodeCanvas = new ChartJSNodeCanvas({
+//     width: 1200, // Increased width
+//     height: 1200, // Increased height
+//   });
+
+//   const configuration: ChartConfiguration<'bar', number[], string> = {
+//     type: 'bar',
+//     data: {
+//       labels: data.map(item => item.que),
+//       datasets: [{
+//         label: 'Scores',
+//         minBarLength: 200,
+//         data: data.map(item => item.value),
+//         backgroundColor: data.map(item => item.value >= 70 ? 'green' : 'red'),
+//       }],
+//     },
+//     options: {
+//       responsive: false,
+//       plugins: {
+//         legend: {
+//           display: true,
+//           labels: {
+//             font: {
+//               weight: 'bold', // Bold legend labels
+//             },
+//           },
+//         },
+//         tooltip: {
+//           callbacks: {
+//             title: (tooltipItems) => {
+//               return tooltipItems[0].label;
+//             },
+//             label: (tooltipItem) => {
+//               return `${tooltipItem.dataset.label}: ${tooltipItem.raw}`;
+//             },
+//           },
+//           bodyFont: {
+//             weight: 'bold', // Bold tooltip text
+//           },
+//         },
+//       },
+//       layout: {
+//         padding: {
+//           top: 30,
+//           bottom: 20,
+//           left: 40,
+//           right: 40,
+//         },
+//       },
+//       indexAxis: 'y',
+//       scales: {
+//         x: {
+//           type: 'linear',
+//           ticks: {
+//             stepSize: 20,
+//             callback: function (tickValue: number | string) {
+//               const value = typeof tickValue === 'number' ? tickValue : parseFloat(tickValue);
+//               return value % 20 === 0 ? value.toString() : '';
+//             },
+//             font: {
+//               weight: 'bold', // Bold x-axis ticks
+//             },
+//           },
+//           suggestedMin: 0,
+//           suggestedMax: 100,
+//           grid: {
+//             drawTicks: false,
+//           },
+//         },
+//         y: {
+//           type: 'category',
+//           labels: data.map(item => item.category),
+//           ticks: {
+//             autoSkip: true,
+//             font: {
+//               weight: 'bold', // Bold y-axis ticks
+//               size: 16
+//             },
+//           },
+//         },
+//       },
+//     },
+//   };
+
+//   // Generate the chart image
+//   const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
+
+//   // Rotate the image 90 degrees clockwise using sharp
+//   const rotatedBuffer = await sharp(buffer)
+//     .rotate(90)
+//     .toBuffer();
+
+//   // Save the rotated image
+//   fs.writeFileSync(outputPath, rotatedBuffer);
+// }
 
 async function createChartImage(data: any[], outputPath: string) {
   const chartJSNodeCanvas = new ChartJSNodeCanvas({
@@ -1804,12 +2350,12 @@ async function createChartImage(data: any[], outputPath: string) {
   const configuration: ChartConfiguration<'bar', number[], string> = {
     type: 'bar',
     data: {
-      labels: data.map(item => item.category),
+      labels: data.map((item, index) => `Que - ${index + 1}`), // X-axis: Questions like Que - 1, Que - 2, etc.
       datasets: [{
         label: 'Scores',
         minBarLength: 200,
-        data: data.map(item => item.value),
-        backgroundColor: data.map(item => item.value >= 70 ? 'green' : 'red'),
+        data: data.map(item => item.value), // Y-axis: Scores
+        backgroundColor: data.map(item => item.value >= 70 ? 'green' : 'red'), // Dynamic colors based on value
       }],
     },
     options: {
@@ -1825,12 +2371,8 @@ async function createChartImage(data: any[], outputPath: string) {
         },
         tooltip: {
           callbacks: {
-            title: (tooltipItems) => {
-              return tooltipItems[0].label;
-            },
-            label: (tooltipItem) => {
-              return `${tooltipItem.dataset.label}: ${tooltipItem.raw}`;
-            },
+            title: (tooltipItems) => tooltipItems[0].label,
+            label: (tooltipItem) => `${tooltipItem.dataset.label}: ${tooltipItem.raw}`,
           },
           bodyFont: {
             weight: 'bold', // Bold tooltip text
@@ -1845,35 +2387,33 @@ async function createChartImage(data: any[], outputPath: string) {
           right: 40,
         },
       },
-      indexAxis: 'y',
       scales: {
-        x: {
+        x: { 
+          type: 'category',
+          labels: data.map((_item, index) => `Que - ${index + 1}`), 
+          ticks: {
+            font: {
+              size: 25,
+              weight: 'bold', 
+            },
+          },
+        },
+        y: { 
           type: 'linear',
           ticks: {
             stepSize: 20,
-            callback: function (tickValue: number | string) {
+            callback: (tickValue: string | number) => {
               const value = typeof tickValue === 'number' ? tickValue : parseFloat(tickValue);
               return value % 20 === 0 ? value.toString() : '';
             },
             font: {
-              weight: 'bold', // Bold x-axis ticks
+              weight: 'bold',
+              size: 25,
             },
           },
-          suggestedMin: 0,
-          suggestedMax: 100,
+          
           grid: {
             drawTicks: false,
-          },
-        },
-        y: {
-          type: 'category',
-          labels: data.map(item => item.category),
-          ticks: {
-            autoSkip: true,
-            font: {
-              weight: 'bold', // Bold y-axis ticks
-              size: 16
-            },
           },
         },
       },
@@ -1883,15 +2423,13 @@ async function createChartImage(data: any[], outputPath: string) {
   // Generate the chart image
   const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
 
-  // Rotate the image 90 degrees clockwise using sharp
+  // Optionally rotate the image (if needed)
   const rotatedBuffer = await sharp(buffer)
-    .rotate(90)
     .toBuffer();
 
-  // Save the rotated image
+  // Save the image
   fs.writeFileSync(outputPath, rotatedBuffer);
 }
-
 
 
 
@@ -2318,6 +2856,8 @@ export async function downloadCFReport(req: Request, res: Response) {
 
 export async function downloadReportQuestion(req: Request, res: Response) {
   const { term, sem, sec, facID, subcode, batch } = req.query;
+  const subjectType: any = await dbQuery(`SELECT qtype FROM subjects WHERE subcode = '${subcode}';`);
+  const { qtype } = subjectType[0];
   const branch = req.body.branchInToken;
 
   const branchName: Record<string, string> = {
@@ -2339,7 +2879,9 @@ export async function downloadReportQuestion(req: Request, res: Response) {
   }
 
   try {
-    const result: any = await dbQuery(`
+    let result: any;
+    if(qtype === "theory"){
+    result = await dbQuery(`
       WITH QuestionText AS (
             SELECT 
                 'Passion and enthusiasm to teach' AS qtext, 1 AS seq
@@ -2417,7 +2959,76 @@ export async function downloadReportQuestion(req: Request, res: Response) {
           GROUP BY qt.qtext, qt.seq, si.branch, ts.sem, si.sec
           ORDER BY si.branch, qt.seq;
         `);
-
+    } else if(qtype === "lab"){
+      result = await dbQuery(`
+        WITH QuestionText AS (
+              SELECT 
+                  'The lab instructor explained objectives and outcomes of lab experiments clearly well before the commencement of the lab' AS qtext, 1 AS seq
+              UNION ALL
+              SELECT 
+                  'The lab instructor explained the procedures involved to perform the lab experiments/algorithms clearly well before the commencement of the lab', 2
+              UNION ALL
+              SELECT 
+                  'The laboratory assignments/discussion questions given after the completion of the experiment are interesting and reinforce what I have learned in the lab and its corresponding theoretical concepts', 3
+              UNION ALL
+              SELECT 
+                  'The lab instructor is impartial in dealing with all students and was regularly available for consultation during the lab', 4
+              UNION ALL
+              SELECT 
+                  'The lab instructor evaluated my work promptly, provided helpful feedback on my progress and offered specific advice to promote improvement', 5
+              UNION ALL
+              SELECT 
+                  'The lab instructor encourages me to work better with others in the lab', 6
+              UNION ALL
+              SELECT 
+                  'The lab instructor helps me learn important techniques associated with this lab course', 7
+              UNION ALL
+              SELECT 
+                  'Experiments/Algorithms detailed in the lab course have enhanced my critical thinking ability', 8
+            )
+            SELECT 
+              qt.qtext AS question, 
+              si.branch, 
+              ls.sem, 
+              COUNT(si.sec) AS count,
+              CASE qt.seq
+                  WHEN 1 THEN AVG(ls.q1)
+                  WHEN 2 THEN AVG(ls.q2)
+                  WHEN 3 THEN AVG(ls.q3)
+                  WHEN 4 THEN AVG(ls.q4)
+                  WHEN 5 THEN AVG(ls.q5)
+                  WHEN 6 THEN AVG(ls.q6)
+                  WHEN 7 THEN AVG(ls.q7)
+                  WHEN 8 THEN AVG(ls.q8)
+              END AS total,
+              ROUND(
+                  CASE 
+                      WHEN COUNT(*) > 0 THEN 
+                          CASE qt.seq
+                              WHEN 1 THEN AVG(ls.q1)
+                              WHEN 2 THEN AVG(ls.q2)
+                              WHEN 3 THEN AVG(ls.q3)
+                              WHEN 4 THEN AVG(ls.q4)
+                              WHEN 5 THEN AVG(ls.q5)
+                              WHEN 6 THEN AVG(ls.q6)
+                              WHEN 7 THEN AVG(ls.q7)
+                              WHEN 8 THEN AVG(ls.q8)
+                          END * 20
+                      ELSE 0 
+                  END, 3) AS adjusted_total
+            FROM labscore${term} ls
+            JOIN studentinfo si ON ls.rollno = si.rollno
+            CROSS JOIN QuestionText qt
+            WHERE si.branch = '${branch}'
+            AND ls.sem = ${sem}
+            AND si.sec = '${sec}'
+            AND ls.facID = '${facID}'
+            AND ls.subcode = '${subcode}'
+            AND si.batch = '${batch}'
+            GROUP BY qt.qtext, qt.seq, si.branch, ls.sem, si.sec
+            ORDER BY si.branch, qt.seq;
+          `);
+    }
     let i: number = Math.floor(Number(sem) / 2);
     let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
     const report: Report[] = result;
