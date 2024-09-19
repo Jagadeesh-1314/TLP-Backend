@@ -455,43 +455,62 @@ export async function CFReportQuestions(req: Request, res: Response) {
 export async function ReportQuestions(req: Request, res: Response) {
     try {
         const { term, sem, sec, facID, subcode, batch, branchInToken: branch } = req.body;
-        const reportquestions: any = await dbQuery(`
-                            WITH QuestionText AS (
-                        SELECT 
-                            'Passion and enthusiasm to teach' AS qtext, 1 AS seq
-                        UNION ALL
-                        SELECT 
-                            'Subject knowledge', 2
-                        UNION ALL
-                        SELECT 
-                            'Clarity and emphasis on concepts', 3
-                        UNION ALL
-                        SELECT 
-                            'Motivate the student to explore the concepts in depth on his/her own', 4
-                        UNION ALL
-                        SELECT 
-                            'Creating interest in the subject', 5
-                        UNION ALL
-                        SELECT 
-                            'Quality of illustrative visuals, examples and applications', 6
-                        UNION ALL
-                        SELECT 
-                            'Regularity, punctuality & uniform coverage of syllabus', 7
-                        UNION ALL
-                        SELECT 
-                            'Discipline and control over the class', 8
-                        UNION ALL
-                        SELECT 
-                            'Promoting student thinking', 9
-                        UNION ALL
-                        SELECT 
-                            'Encouraging student effort & inviting student interaction', 10
-                    )
-                    SELECT 
-                        qt.qtext AS question, 
-                        si.branch, 
-                        ts.sem, 
-                        COUNT(si.sec) AS count,
+        const subjectType: any = await dbQuery(`SELECT qtype FROM subjects WHERE subcode = '${subcode}';`);
+        const { qtype } = subjectType[0];
+        let reportquestions: any;
+        if (qtype === "theory") {
+            reportquestions = await dbQuery(`
+      WITH QuestionText AS (
+            SELECT 
+                'Passion and enthusiasm to teach' AS qtext, 1 AS seq
+            UNION ALL
+            SELECT 
+                'Subject knowledge', 2
+            UNION ALL
+            SELECT 
+                'Clarity and emphasis on concepts', 3
+            UNION ALL
+            SELECT 
+                'Motivate the student to explore the concepts in depth on his/her own', 4
+            UNION ALL
+            SELECT 
+                'Creating interest in the subject', 5
+            UNION ALL
+            SELECT 
+                'Quality of illustrative visuals, examples and applications', 6
+            UNION ALL
+            SELECT 
+                'Regularity, punctuality & uniform coverage of syllabus', 7
+            UNION ALL
+            SELECT 
+                'Discipline and control over the class', 8
+            UNION ALL
+            SELECT 
+                'Promoting student thinking', 9
+            UNION ALL
+            SELECT 
+                'Encouraging student effort & inviting student interaction', 10
+          )
+          SELECT 
+            qt.qtext AS question, 
+            si.branch, 
+            ts.sem, 
+            COUNT(si.sec) AS count,
+            CASE qt.seq
+                WHEN 1 THEN AVG(ts.q1)
+                WHEN 2 THEN AVG(ts.q2)
+                WHEN 3 THEN AVG(ts.q3)
+                WHEN 4 THEN AVG(ts.q4)
+                WHEN 5 THEN AVG(ts.q5)
+                WHEN 6 THEN AVG(ts.q6)
+                WHEN 7 THEN AVG(ts.q7)
+                WHEN 8 THEN AVG(ts.q8)
+                WHEN 9 THEN AVG(ts.q9)
+                WHEN 10 THEN AVG(ts.q10)
+            END AS total,
+            ROUND(
+                CASE 
+                    WHEN COUNT(*) > 0 THEN 
                         CASE qt.seq
                             WHEN 1 THEN AVG(ts.q1)
                             WHEN 2 THEN AVG(ts.q2)
@@ -503,36 +522,91 @@ export async function ReportQuestions(req: Request, res: Response) {
                             WHEN 8 THEN AVG(ts.q8)
                             WHEN 9 THEN AVG(ts.q9)
                             WHEN 10 THEN AVG(ts.q10)
-                        END AS total,
-                        ROUND(
-                            CASE 
-                                WHEN COUNT(*) > 0 THEN 
-                                    CASE qt.seq
-                                        WHEN 1 THEN AVG(ts.q1)
-                                        WHEN 2 THEN AVG(ts.q2)
-                                        WHEN 3 THEN AVG(ts.q3)
-                                        WHEN 4 THEN AVG(ts.q4)
-                                        WHEN 5 THEN AVG(ts.q5)
-                                        WHEN 6 THEN AVG(ts.q6)
-                                        WHEN 7 THEN AVG(ts.q7)
-                                        WHEN 8 THEN AVG(ts.q8)
-                                        WHEN 9 THEN AVG(ts.q9)
-                                        WHEN 10 THEN AVG(ts.q10)
-                                    END * 20
-                                ELSE 0 
-                            END, 3) AS adjusted_total
-                    FROM theoryscore${term} ts
-                    JOIN studentinfo si ON ts.rollno = si.rollno
-                    CROSS JOIN QuestionText qt
-                    WHERE si.branch = '${branch}'
-                    AND ts.sem = ${sem}
-                    AND si.sec = '${sec}'
-                    AND ts.facID = '${facID}'
-                    AND ts.subcode = '${subcode}'
-                    AND si.batch = '${batch}'
-                    GROUP BY qt.qtext, qt.seq, si.branch, ts.sem, si.sec
-                    ORDER BY si.branch, qt.seq;
-            `);
+                        END * 20
+                    ELSE 0 
+                END, 3) AS adjusted_total
+          FROM theoryscore${term} ts
+          JOIN studentinfo si ON ts.rollno = si.rollno
+          CROSS JOIN QuestionText qt
+          WHERE si.branch = '${branch}'
+          AND ts.sem = ${sem}
+          AND si.sec = '${sec}'
+          AND ts.facID = '${facID}'
+          AND ts.subcode = '${subcode}'
+          AND si.batch = '${batch}'
+          GROUP BY qt.qtext, qt.seq, si.branch, ts.sem, si.sec
+          ORDER BY si.branch, qt.seq;
+        `);
+        } else if (qtype === "lab") {
+            reportquestions = await dbQuery(`
+        WITH QuestionText AS (
+              SELECT 
+                  'The lab instructor explained objectives and outcomes of lab experiments clearly well before the commencement of the lab' AS qtext, 1 AS seq
+              UNION ALL
+              SELECT 
+                  'The lab instructor explained the procedures involved to perform the lab experiments/algorithms clearly well before the commencement of the lab', 2
+              UNION ALL
+              SELECT 
+                  'The laboratory assignments/discussion questions given after the completion of the experiment are interesting and reinforce what I have learned in the lab and its corresponding theoretical concepts', 3
+              UNION ALL
+              SELECT 
+                  'The lab instructor is impartial in dealing with all students and was regularly available for consultation during the lab', 4
+              UNION ALL
+              SELECT 
+                  'The lab instructor evaluated my work promptly, provided helpful feedback on my progress and offered specific advice to promote improvement', 5
+              UNION ALL
+              SELECT 
+                  'The lab instructor encourages me to work better with others in the lab', 6
+              UNION ALL
+              SELECT 
+                  'The lab instructor helps me learn important techniques associated with this lab course', 7
+              UNION ALL
+              SELECT 
+                  'Experiments/Algorithms detailed in the lab course have enhanced my critical thinking ability', 8
+            )
+            SELECT 
+              qt.qtext AS question, 
+              si.branch, 
+              ls.sem, 
+              COUNT(si.sec) AS count,
+              CASE qt.seq
+                  WHEN 1 THEN AVG(ls.q1)
+                  WHEN 2 THEN AVG(ls.q2)
+                  WHEN 3 THEN AVG(ls.q3)
+                  WHEN 4 THEN AVG(ls.q4)
+                  WHEN 5 THEN AVG(ls.q5)
+                  WHEN 6 THEN AVG(ls.q6)
+                  WHEN 7 THEN AVG(ls.q7)
+                  WHEN 8 THEN AVG(ls.q8)
+              END AS total,
+              ROUND(
+                  CASE 
+                      WHEN COUNT(*) > 0 THEN 
+                          CASE qt.seq
+                              WHEN 1 THEN AVG(ls.q1)
+                              WHEN 2 THEN AVG(ls.q2)
+                              WHEN 3 THEN AVG(ls.q3)
+                              WHEN 4 THEN AVG(ls.q4)
+                              WHEN 5 THEN AVG(ls.q5)
+                              WHEN 6 THEN AVG(ls.q6)
+                              WHEN 7 THEN AVG(ls.q7)
+                              WHEN 8 THEN AVG(ls.q8)
+                          END * 20
+                      ELSE 0 
+                  END, 3) AS adjusted_total
+            FROM labscore${term} ls
+            JOIN studentinfo si ON ls.rollno = si.rollno
+            CROSS JOIN QuestionText qt
+            WHERE si.branch = '${branch}'
+            AND ls.sem = ${sem}
+            AND si.sec = '${sec}'
+            AND ls.facID = '${facID}'
+            AND ls.subcode = '${subcode}'
+            AND si.batch = '${batch}'
+            GROUP BY qt.qtext, qt.seq, si.branch, ls.sem, si.sec
+            ORDER BY si.branch, qt.seq;
+          `);
+        }
         return res.json({ reportquestions: reportquestions });
     } catch (error) {
         console.error('Error executing query:', error);

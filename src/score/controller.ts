@@ -1,6 +1,7 @@
 import { Response, Request } from "express";
 import dbQuery from "../services/db";
 import { subjectTableProps } from "../interfaces/manage";
+import { error } from "console";
 
 
 // export async function postScore(req: Request, res: Response) {
@@ -250,16 +251,23 @@ export async function postScore(req: Request, res: Response) {
     }
     // console.log(allParamsArray.map(({ query, params }) => ({ query, params })));
 
-    const executeBatch = allParamsArray.map(({ query, params }) => dbQuery(query, params));
 
+    // const substitutedQueries = allParamsArray.map(({ query, params }) => {
+    //   let i = 0;
+    //   const substitutedQuery = query.replace(/\?/g, () => params[i++]);
+    //   return substitutedQuery;
+    // });
+    // console.log(substitutedQueries);
+    
+    const executeBatch = allParamsArray.map(({ query, params }) => dbQuery(query, params));
     const results: any = await Promise.all(executeBatch);
     const allProtocol41 = results.every((result: { protocol41: boolean }) => result.protocol41);
     if (allProtocol41) {
       const tokenQuery = `UPDATE studentinfo SET token = 'facdone' WHERE rollno = (?)`;
-      await dbQuery(tokenQuery, [username]);
+      await dbQuery(tokenQuery, [username]);  
+      return res.json({ done: true });
     }
-
-    return res.json({ done: true });
+    return res.json({ done : false })
   } catch (err) {
     console.error("Error while inserting score:", err);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -273,13 +281,18 @@ export async function cfScore(req: Request, res: Response) {
     const username = req.body.usernameInToken;
     const data: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
     const { count } = data[0];
-    const userQuery = `SELECT sem, branch, batch FROM studentinfo WHERE rollno = TRIM(?)`;
+    const userQuery = `SELECT sem, branch, batch, token FROM studentinfo WHERE rollno = TRIM(?)`;
     const userResults: any = await dbQuery(userQuery, [username]);
 
     if (userResults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
     }
-    const { sem, branch, batch } = userResults[0];
+    const { sem, branch, batch, token } = userResults[0];
+
+    if(token === 'undone'){
+      res.json({ done: false, error: 'You should do Subjects Feedback First' });
+      return;
+    }
 
     const scoreValues: number[] = Object.values(scores[Object.keys(scores).length - 1]).map(value => Number(value));
     if (!scoreValues.every((val: number) => val >= 1 && val <= 5)) {
