@@ -15,7 +15,7 @@ const tables = [
 ];
 
 function processCSVStudents(data: string, username: string, branch: string, batch: string) {
-  if (username === 'admin') {
+  if (username === 'admin' || username === 'fmegcet') {
     return data
       .trim()
       .split("\n")
@@ -71,8 +71,20 @@ function processCSVSubjects(data: string, subtype: string, def: string) {
 }
 
 
-function processCSVTimeTable(data: string, branch: string) {
+function processCSVTimeTable(data: string, branch: string, username: string) {
+  if (username === 'admin' || username === 'fmegcet') {
   return data
+    .trim()
+    .split("\n")
+    .map((row) =>
+      row
+        .trim()
+        .split(",")
+        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
+    )
+    .map((row) => `(${row.join(",")})`);
+  } else {
+    return data
     .trim()
     .split("\n")
     .map((row) =>
@@ -83,7 +95,10 @@ function processCSVTimeTable(data: string, branch: string) {
         .concat(`'${branch}'`)
     )
     .map((row) => `(${row.join(",")})`);
+  }
 }
+
+
 export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string, batch: string, def: string, username: string) {
   try {
     const workbook = xlsx.readFile(location);
@@ -120,7 +135,7 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
         return responses.DoneMSG;
       }
       else if (tableName === "timetable") {
-        const rows = processCSVTimeTable(data, branch);
+        const rows = processCSVTimeTable(data, branch, username);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`

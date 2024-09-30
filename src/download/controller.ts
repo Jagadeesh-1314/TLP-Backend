@@ -16,7 +16,7 @@ type tableNames =
   | "faculty"
   | "report1"
   | "theoryscore2"
-  | "labscore"
+  | "labscore2"
   | "studentinfo"
   | "subjects"
   | "timetable"
@@ -343,8 +343,8 @@ const tables: {
     ordering: " ORDER BY subCode ",
     fileName: "Subject_info",
   },
-  labscore: {
-    query: `SELECT * From labscore`,
+  labscore2: {
+    query: `SELECT * From labscore2`,
     ordering: " GROUP BY rollno, subcode ",
     fileName: "LabScore_info",
   },
@@ -445,15 +445,15 @@ interface Student {
 
 
 export async function unfilledstudents(req: Request, res: Response) {
-  const { sem, sec } = req.query;
-  const branch = req.body.branchInToken;
+  const { sem, sec, fbranch } = req.query;
+  const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
   if (!sem || !sec) {
     return res.status(400).send('Semester and Section are required.');
   }
 
   try {
     const result: any = await dbQuery(
-      `SELECT rollno, name, sec, sem FROM studentinfo WHERE sem = ${sem} AND sec = '${sec}' and token = 'undone' AND branch = '${branch}';`,
+      `SELECT rollno, name, sec, sem FROM studentinfo WHERE sem = ${sem} AND sec = '${sec}' and token != 'done' AND branch = '${branchControl}';`,
     );
     let i: number = Math.floor(Number(sem) / 2);
     let j: number = (Math.floor(Number(sem) % 2) != 0) ? 1 : 2;
@@ -545,7 +545,7 @@ export async function unfilledstudents(req: Request, res: Response) {
     const buffer = await Packer.toBuffer(doc);
 
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    const filename = `UnfilledList_${i}-${j}_${sec}_${timestamp}.docx`;
+    const filename = `UnfilledList_${i + Number(sem) % 2}-${j}_${sec}_${timestamp}.docx`;
     const docFilePath = path.join(__dirname, 'tmp', filename);
     fs.mkdirSync(path.dirname(docFilePath), { recursive: true });
 
@@ -965,12 +965,12 @@ async function generateChart(reportData: any[]) {
       scales: {
         y: {
           min: 0,
-          max: 100, 
+          max: 100,
           beginAtZero: true,
           ticks: {
-            stepSize: 20, 
+            stepSize: 20,
             font: {
-              weight: 'bold', 
+              weight: 'bold',
             },
           },
         },
@@ -979,7 +979,7 @@ async function generateChart(reportData: any[]) {
         legend: {
           labels: {
             font: {
-              weight: 'bold', 
+              weight: 'bold',
             },
           },
         },
@@ -1245,7 +1245,7 @@ async function generateChart(reportData: any[]) {
 //                       right: 75,
 //                     },
 //                   }),
-                  
+
 //                 ],
 //               }),
 //               // Table Rows
@@ -1382,7 +1382,7 @@ async function generateChart(reportData: any[]) {
 //         ],
 //       },
 //     ];
-       
+
 
 //     const doc = new Document({
 //       sections: sections,
@@ -1813,8 +1813,9 @@ async function generateChart(reportData: any[]) {
 
 
 export async function downloadReport(req: Request, res: Response) {
-  const { sem, sec, batch, count } = req.query;
-  const branch = req.body.branchInToken;
+  const { sem, sec, batch, count, fbranch } = req.query;
+  const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+
 
   const branchName: Record<string, string> = {
     CSE: "Computer Science and Engineering",
@@ -1828,7 +1829,7 @@ export async function downloadReport(req: Request, res: Response) {
     CS: "Cyber Security",
   };
 
-  const fullBranchName = branchName[branch];
+  const fullBranchName = branchName[branchControl];
 
   if (!sem || !batch || !count) {
     return res.status(400).send("Semester, Batch, and Count are required.");
@@ -1841,7 +1842,7 @@ export async function downloadReport(req: Request, res: Response) {
        FROM report${count} 
        JOIN subjects 
        ON TRIM(subjects.subcode) = TRIM(report${count}.subcode)
-       WHERE sem = ${sem} AND batch = ${batch} ${secCondition} AND branch = '${branch}'
+       WHERE sem = ${sem} AND batch = ${batch} ${secCondition} AND branch = '${branchControl}'
        ORDER BY sec;`
     );
 
@@ -1867,7 +1868,7 @@ export async function downloadReport(req: Request, res: Response) {
       return [
         // Section Header
         new Paragraph({
-          text: `Section: ${i+Number(sem)%2}-${section}`,
+          text: `Section: ${i + Number(sem) % 2}-${section}`,
           heading: HeadingLevel.HEADING_1,
           alignment: AlignmentType.CENTER,
           spacing: { after: 500 },
@@ -2220,7 +2221,7 @@ export async function downloadReport(req: Request, res: Response) {
     fs.writeFileSync(filePath, buffer);
 
     // Send File to Client
-    res.download(filePath, `Report-${batch}-${sem}-${sec? sec : `ALL_Sections`}-${timestamp}.docx`, (err) => {
+    res.download(filePath, `Report-${batch}-${sem}-${sec ? sec : `ALL_Sections`}-${timestamp}.docx`, (err) => {
       if (err) {
         console.error("Error sending file:", err);
         res.status(500).send("Error generating report.");
@@ -2388,17 +2389,17 @@ async function createChartImage(data: any[], outputPath: string) {
         },
       },
       scales: {
-        x: { 
+        x: {
           type: 'category',
-          labels: data.map((_item, index) => `Que - ${index + 1}`), 
+          labels: data.map((_item, index) => `Que - ${index + 1}`),
           ticks: {
             font: {
               size: 25,
-              weight: 'bold', 
+              weight: 'bold',
             },
           },
         },
-        y: { 
+        y: {
           type: 'linear',
           ticks: {
             stepSize: 20,
@@ -2411,7 +2412,7 @@ async function createChartImage(data: any[], outputPath: string) {
               size: 25,
             },
           },
-          
+
           grid: {
             drawTicks: false,
           },
@@ -2434,8 +2435,8 @@ async function createChartImage(data: any[], outputPath: string) {
 
 
 export async function downloadCFReport(req: Request, res: Response) {
-  const { sem, batch, count } = req.query;
-  const branch = req.body.branchInToken;
+  const { sem, batch, count, fbranch } = req.query;
+  const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
 
   const branchName: Record<string, string> = {
     CSE: "Computer Science and Engineering",
@@ -2456,8 +2457,8 @@ export async function downloadCFReport(req: Request, res: Response) {
   }
 
   try {
-    const result: any = await dbQuery(
-      `WITH QuestionText AS (
+    const query = `
+                  WITH QuestionText AS (
                     SELECT 
                         'Employability Skills' AS qtext, 0 AS seq
                     UNION ALL
@@ -2557,16 +2558,27 @@ export async function downloadCFReport(req: Request, res: Response) {
                             ELSE 0 
                         END,
                     3) AS adjusted_total
-                    FROM cf1
+                    FROM cf${count}
                     CROSS JOIN QuestionText qt
                     WHERE branch = '${branch}' AND sem = ${sem} AND batch = ${batch}
                     GROUP BY qt.qtext, qt.seq, branch, sem, batch
                     ORDER BY branch, qt.seq; 
-              `
-    );
+          `;
+      
+    const result: any = await dbQuery(query);
 
-    let i: number = Math.floor(Number(sem) / 2);
-    let j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+
+    const i: number = Math.floor(Number(sem) / 2);
+    const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+
+    let c = Math.floor(Number(sem) / 2);
+    if (Number(sem) % 2 === 0) {
+      c = c - 1;
+    }
+
+    const a: number = Number(batch) + c;
+    const b: number = (a % 100) + 1;
+
     const report: Report[] = result;
 
     // Prepare chart data
@@ -2629,7 +2641,7 @@ export async function downloadCFReport(req: Request, res: Response) {
         new Paragraph({
           children: [
             new TextRun({
-              text: `Online Feedback report for 2023-24 ${j}-Semester Term-${count}`,
+              text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${count}`,
               font: "Times New Roman",
               size: 30,
               bold: true,
@@ -2798,7 +2810,7 @@ export async function downloadCFReport(req: Request, res: Response) {
                     right: { style: BorderStyle.SINGLE, size: 1 },
                   },
                 }),
-               
+
               ],
             })),
 
@@ -2846,7 +2858,7 @@ export async function downloadCFReport(req: Request, res: Response) {
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
     fs.writeFileSync(fileName, buffer);
     res.download(fileName, `CFReport-${branch}-${batch}-${timestamp}.docx`, () => {
-      fs.unlinkSync(fileName); 
+      fs.unlinkSync(fileName);
     });
   } catch (error) {
     console.error("Error generating report:", error);
@@ -2854,11 +2866,14 @@ export async function downloadCFReport(req: Request, res: Response) {
   }
 }
 
+
 export async function downloadReportQuestion(req: Request, res: Response) {
-  const { term, sem, sec, facID, subcode, batch } = req.query;
-  const subjectType: any = await dbQuery(`SELECT qtype FROM subjects WHERE subcode = '${subcode}';`);
-  const { qtype } = subjectType[0];
-  const branch = req.body.branchInToken;
+  const { term, sem, sec, facID, subcode, batch, fbranch } = req.query;
+  const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+  const subjectType: any = await dbQuery(`SELECT qtype, subName, subCode FROM subjects WHERE subcode = '${subcode}';`);
+  const facultyName: any = await dbQuery(`SELECT facName FROM faculty WHERE facID = '${facID}';`);
+  const { facName } = facultyName[0]
+  const { qtype, subName, subCode } = subjectType[0];
 
   const branchName: Record<string, string> = {
     CSE: "Computer Science and Engineering",
@@ -2872,7 +2887,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
     CS: "Cyber Security",
   };
 
-  const fullBranchName = branchName[branch];
+  const fullBranchName = branchName[branchControl];
 
   if (!sem || !batch || !term) {
     return res.status(400).send("Semester, Batch, and Count are required.");
@@ -2880,8 +2895,8 @@ export async function downloadReportQuestion(req: Request, res: Response) {
 
   try {
     let result: any;
-    if(qtype === "theory"){
-    result = await dbQuery(`
+    if (qtype === "theory") {
+      result = await dbQuery(`
       WITH QuestionText AS (
             SELECT 
                 'Passion and enthusiasm to teach' AS qtext, 1 AS seq
@@ -2950,7 +2965,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
           FROM theoryscore${term} ts
           JOIN studentinfo si ON ts.rollno = si.rollno
           CROSS JOIN QuestionText qt
-          WHERE si.branch = '${branch}'
+          WHERE si.branch = '${branchControl}'
           AND ts.sem = ${sem}
           AND si.sec = '${sec}'
           AND ts.facID = '${facID}'
@@ -2959,7 +2974,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
           GROUP BY qt.qtext, qt.seq, si.branch, ts.sem, si.sec
           ORDER BY si.branch, qt.seq;
         `);
-    } else if(qtype === "lab"){
+    } else if (qtype === "lab") {
       result = await dbQuery(`
         WITH QuestionText AS (
               SELECT 
@@ -3019,7 +3034,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
             FROM labscore${term} ls
             JOIN studentinfo si ON ls.rollno = si.rollno
             CROSS JOIN QuestionText qt
-            WHERE si.branch = '${branch}'
+            WHERE si.branch = '${branchControl}'
             AND ls.sem = ${sem}
             AND si.sec = '${sec}'
             AND ls.facID = '${facID}'
@@ -3046,7 +3061,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
       sec: section,
       reportData: report.filter((item) => item.sec === section),
     }))
-    ).map((sectionData) => ({
+    ).map(() => ({
       properties: {
         type: SectionType.NEXT_PAGE,
       },
@@ -3116,6 +3131,78 @@ export async function downloadReportQuestion(req: Request, res: Response) {
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 },
         }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Faculty Name: ${facName}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Semester: ${sem}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Section: ${sec}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Batch: ${batch}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Subject Code: ${subCode}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 50 },
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Subject Name: ${subName}`,
+              font: "Times New Roman",
+              size: 22,
+              bold: true,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 200 },
+        }),
 
         // Table with Data
         new Table({
@@ -3262,7 +3349,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
                     right: { style: BorderStyle.SINGLE, size: 1 },
                   },
                 }),
-               
+
               ],
             })),
 
@@ -3310,7 +3397,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
     const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
     fs.writeFileSync(fileName, buffer);
     res.download(fileName, `ReportQue-${facID}-${sec}-${timestamp}.docx`, () => {
-      fs.unlinkSync(fileName); 
+      fs.unlinkSync(fileName);
     });
   } catch (error) {
     console.error("Error generating report:", error);

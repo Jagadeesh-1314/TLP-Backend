@@ -10,7 +10,8 @@ import { UsersTableArr } from "../interfaces/manage";
 // ANCHOR Getting Student Details 
 
 export async function getTable(req: Request, res: Response) {
-  const { tableName } = req.query;
+  const { tableName, fbranch } = req.query;
+  const branch = (req.body.branchInToken !== 'FME' && fbranch?.length === 0) ? req.body.branchInToken : fbranch;
   if (isAnyUndefined(tableName)) {
     res.status(400).json(responses.NotAllParamsGiven);
     return;
@@ -19,11 +20,15 @@ export async function getTable(req: Request, res: Response) {
     let query = `SELECT * FROM ${tableName}`;
 
     if (tableName === 'timetable') {
-      query = `SELECT t.*, f.facname FROM timetable t JOIN faculty f ON t.facID = f.facID`;
+      query = `SELECT t.*, f.facname, s.subName FROM timetable t JOIN faculty f ON t.facID = f.facID JOIN subjects s on s.subCode = t.subCode`;
     }
-    if (tableName !== 'faculty' && tableName !== 'subjects') {
-      query += ` WHERE branch = '${req.body.branchInToken}' ORDER BY sem, sec;`;
+    if (tableName !== 'faculty' && tableName !== 'subjects' && req.body.branchInToken === 'FME') {
+      query += ` WHERE branch = '${branch}' and sem IN (1, 2) ORDER BY sem, sec;`
     }
+    else if (tableName !== 'faculty' && tableName !== 'subjects'){
+      query += ` WHERE branch = '${branch}' and sem NOT IN (1, 2) ORDER BY sem, sec;`
+    }
+    
     let timeTable: any = await dbQuery(query);
     timeTable = JSON.parse(JSON.stringify(timeTable));
     res.json({ tableData: timeTable });
@@ -32,6 +37,23 @@ export async function getTable(req: Request, res: Response) {
     res.json(responses.ErrorWhileDBRequest);
   }
 }
+
+
+
+export async function branchDetails(req: Request, res: Response) {
+  try {
+    const result: any = await dbQuery(`
+      SELECT DISTINCT branch FROM studentinfo WHERE sem in (1, 2) ORDER BY branch;
+    `);
+    const branchDetails = result.map((row: { branch: string }) => row.branch);
+    
+    return res.json({ branchDetails: branchDetails  });
+  } catch (error) {
+    console.error('Error executing query:', error);
+    res.status(500).send('Error executing query');
+  }
+}
+
 
 // ANCHOR Editing Student Details
 
@@ -193,7 +215,6 @@ export async function addUser(req: Request, res: Response) {
   const password: string = md5(req.body.details.password);
   const displayName: string = req.body.details.displayName;
   const branch: string = req.body.details.branch;
-  console.log(req.body)
   if (isAnyUndefined(username, password, displayName, branch)) {
     return res.status(400).json(responses.NotAllParamsGiven);
   }

@@ -21,7 +21,7 @@ export async function fetchTerm(req: Request, res: Response) {
 
 export async function term1(req: Request, res: Response) {
   try {
-    const result = dbQuery(`
+    const result = await dbQuery(`
       
       UPDATE COUNTTERM SET COUNT = 2;
       UPDATE STUDENTINFO SET token = "undone" where branch = '${req.body.branchInToken}';      
@@ -37,7 +37,7 @@ export async function term1(req: Request, res: Response) {
 
 export async function term2(req: Request, res: Response) {
   try {
-    const result = dbQuery(`
+    const result = await dbQuery(`
       UPDATE COUNTTERM SET COUNT = 1;
       UPDATE STUDENTINFO SET token = "undone" where branch = '${req.body.branchInToken}';
     `);

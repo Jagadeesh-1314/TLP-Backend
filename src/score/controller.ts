@@ -165,6 +165,8 @@ export async function postScore(req: Request, res: Response) {
     const username = req.body.usernameInToken;
     const userQuery = `SELECT sem, sec, branch, batch FROM studentinfo WHERE rollno = TRIM('${username}')`;
     const userResults: any = await dbQuery(userQuery);
+    const countData: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
+    const { count } = countData[0];
 
     if (userResults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
@@ -195,8 +197,6 @@ export async function postScore(req: Request, res: Response) {
       }
     });
 
-    const countData: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const { count } = countData[0];
 
     const allParamsArray: { query: string, params: any[] }[] = [];
 

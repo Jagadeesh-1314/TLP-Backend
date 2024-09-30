@@ -54,29 +54,17 @@ export async function isAdmin(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-// Example function to get designation (not used in middleware)
-export async function desg(req: Request, res: Response) {
-  const { username } = req.query;
-  const userQuery = `SELECT desg FROM users WHERE username = ?`;
-  const [userResult]: any = await dbQuery(userQuery, [username]);
-  if (userResult) {
-    res.json({ desg: userResult.desg });
-  } else {
-    res.json({ desg: 'null' });
-  }
-}
-
 // Middleware to validate user login
 export async function isUserValid(req: Request, res: Response) {
   const { username, password } = req.body;
   const ip = req.ip as string;
-  const userDesg = `SELECT desg FROM USERS WHERE USERNAME = '${username}'`;
+  const userDesg = `SELECT desg FROM USERS WHERE USERNAME = ?`;
 
   const userQuery = `SELECT * FROM users WHERE BINARY username = ?`;
   const studentQuery = `SELECT rollno AS userName, password, Name as displayName, branch, batch, sem FROM studentinfo WHERE BINARY rollno = ?`;
 
   try {
-    const userResult: any = await dbQuery(userDesg);
+    const userResult: any = await dbQuery(userDesg, [username]);
     // console.log(userResult)
     let query;
     if (userResult.length === 0) {

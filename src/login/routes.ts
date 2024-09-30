@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { desg, isUserValid } from "./controller";
+import { isUserValid } from "./controller";
 import { rateLimit } from "express-rate-limit";
 import { rateLimitOn } from "../../config-local";
 
@@ -19,7 +19,6 @@ if (rateLimitOn) {
     router.post("/login", isUserValid);
 }
 
-router.get("/desg", desg);
 
 
 export default router;

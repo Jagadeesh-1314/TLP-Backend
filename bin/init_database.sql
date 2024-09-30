@@ -242,6 +242,6 @@ CREATE TABLE electives (
 
 
 
-INSERT INTO users VALUES ("admin", "2d207f75d95007876a8a2971928102c1", "AD", "admin", '');
+INSERT INTO users VALUES ("admin", "89110ab33e4f960f498d1ebe8318d459", "AD", "admin", '');
 
 
