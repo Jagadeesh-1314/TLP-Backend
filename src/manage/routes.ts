@@ -10,12 +10,16 @@ import {
   updateUser,
   getSubName,
   getUsers,
+  branchDetails,
 } from "./controller";
 
 const router: Router = Router();
 
 // Registering all the Manage Users routes
 router.get("/table", getTable);
+
+// Getting Branches
+router.get("/branchdetails", branchDetails);
 
 // Getting Users
 router.get("/users", getUsers);

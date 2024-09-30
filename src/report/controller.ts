@@ -4,7 +4,8 @@ import dbQuery from "../services/db";
 
 export async function report1(req: Request, res: Response) {
     try {
-        const branch = req.body.branchInToken;
+        const { fbranch, term } = req.query;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const query = `
             SELECT COUNT(*) as count, f.facID, ts.subcode, f.facName, si.sec, si.sem, si.branch,
             SUM(ts.score) as totalScore, ts.batch
@@ -14,7 +15,6 @@ export async function report1(req: Request, res: Response) {
             WHERE si.branch = '${branch}'
             GROUP BY ts.facID, ts.subcode, si.sec, ts.batch, ts.sem, si.branch;
         `;
-
         // Execute the query
         const result: any = await dbQuery(query);
         if (result.length === 0) {
@@ -53,7 +53,6 @@ export async function report1(req: Request, res: Response) {
             WHERE si.branch = '${branch}'
             GROUP BY ls.facID, ls.subcode, si.sec, ls.batch, ls.sem, si.branch;
         `;
-
         // Execute the query
         const labresult: any = await dbQuery(labquery);
 
@@ -85,8 +84,15 @@ export async function report1(req: Request, res: Response) {
                 branch,
             ]);
         }
-        //   Lstn70()
-        const details = await dbQuery(`SELECT sem, batch, sec FROM report1 GROUP BY sem, batch, sec;`);
+        let details: any;
+        if (req.body.branchInToken === 'FME') {
+            details = await dbQuery(`SELECT sem, batch, sec, branch FROM report1 where sem = ${term} GROUP BY sem, batch, sec, branch;`)
+        } else {
+            details = await dbQuery(`SELECT sem, batch, sec FROM report1 GROUP BY sem, batch, sec;`);
+        }
+       if(details.length === 0){
+        return res.json({ done: false });
+       }
         return res.json({ done: true, details: details });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -97,7 +103,8 @@ export async function report1(req: Request, res: Response) {
 
 export async function report2(req: Request, res: Response) {
     try {
-        const branch = req.body.branchInToken;
+        const { fbranch, term } = req.query;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const query = `
             SELECT COUNT(*) as count, f.facID, ts.subcode, f.facName, si.sec, si.sem, si.branch,
             SUM(ts.score) as totalScore, ts.batch
@@ -178,9 +185,12 @@ export async function report2(req: Request, res: Response) {
                 branch,
             ]);
         }
-
-        // Lstn70()
-        const details = await dbQuery(`SELECT sem, batch, sec FROM report2 GROUP BY sem, batch, sec;`);
+        let details;
+        if (branch === 'FME') {
+            details = await dbQuery(`SELECT sem, batch, sec, branch FROM report2 where sem = ${term} GROUP BY sem, batch, sec, branch;`)
+        } else {
+            details = await dbQuery(`SELECT sem, batch, sec FROM report2 GROUP BY sem, batch, sec;`);
+        }
         return res.json({ done: true, details: details });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -191,7 +201,8 @@ export async function report2(req: Request, res: Response) {
 
 export async function cfreport1(req: Request, res: Response) {
     try {
-        const branch = req.body.branchInToken;
+        const { fbranch } = req.query;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const query = `
        SELECT COUNT(si.batch) as count, cf1.branch, cf1.batch, si.sem,
                   SUM(cf1.score) as totalScore
@@ -237,7 +248,8 @@ export async function cfreport1(req: Request, res: Response) {
 
 export async function cfreport2(req: Request, res: Response) {
     try {
-        const branch = req.body.branchInToken;
+        const { fbranch } = req.query;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const query = `
        SELECT COUNT(si.batch) as count, cf2.branch, cf2.batch, si.sem,
                   SUM(cf2.score) as totalScore
@@ -282,13 +294,9 @@ export async function cfreport2(req: Request, res: Response) {
 
 export async function fetchReport1(req: Request, res: Response) {
     try {
-        const { batch, sec, sem } = req.query;
-        const branch = req.body.branchInToken;
-        if (sec?.length === 0) {
-            const report: any = await dbQuery(`SELECT report1.*, subjects.subname FROM report1 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
-            return res.json({ report: report });
-        }
-        const report: any = await dbQuery(`SELECT report1.*, subjects.subname FROM report1 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}' ;`);
+        const { batch, sec, sem, fbranch } = req.body;
+        const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const report: any = await dbQuery(`SELECT report1.*, subjects.subname FROM report1 JOIN subjects ON TRIM(report1.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branchControl}' ;`);
         return res.json({ report: report });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -298,13 +306,9 @@ export async function fetchReport1(req: Request, res: Response) {
 
 export async function fetchReport2(req: Request, res: Response) {
     try {
-        const { batch, sec, sem } = req.query;
-        const branch = req.body.branchInToken;
-        if (sec?.length === 0) {
-            const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND branch='${branch}'`);
-            return res.json({ report: report });
-        }
-        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branch}' ;`);
+        const { batch, sec, sem, fbranch } = req.body;
+        const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const report: any = await dbQuery(`SELECT report2.*, subjects.subname FROM report2 JOIN subjects ON TRIM(report2.subcode) = TRIM(subjects.subcode) WHERE batch=${batch} AND sem=${sem} AND sec='${sec}' AND branch='${branchControl}' ;`);
         return res.json({ report: report });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -316,14 +320,10 @@ export async function fetchReport2(req: Request, res: Response) {
 
 export async function fetchCFReport(req: Request, res: Response) {
     try {
-        const { term, batch, branchInToken: branch, sem } = req.body;
-        if (!batch || batch.length === 0) {
-            const details = await dbQuery(`SELECT batch, branch, sem FROM cfreport${term} WHERE branch='${branch}' GROUP BY batch, branch, sem;`);
-            return res.json({ done: true, details: details });
-        } else {
-            const cfreport: any = await dbQuery(`SELECT *  FROM cfreport${term} where batch=${batch} AND branch='${branch}' AND sem = ${sem};`);
-            return res.json({ cfreport: cfreport });
-        }
+        const { term, batch, fbranch, sem } = req.body;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const cfreport: any = await dbQuery(`SELECT *  FROM cfreport${term} where batch=${batch} AND branch='${branch}' AND sem = ${sem};`);
+        return res.json({ cfreport: cfreport });
     } catch (error) {
         console.error('Error executing query:', error);
         res.status(500).send('Error executing query');
@@ -334,7 +334,8 @@ export async function fetchCFReport(req: Request, res: Response) {
 
 export async function CFReportQuestions(req: Request, res: Response) {
     try {
-        const { batch, term, sem, branchInToken: branch } = req.body;
+        const { term, sem, batch, fbranch } = req.body;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const cfreportquestions: any = await dbQuery(`
                             WITH QuestionText AS (
                     SELECT 
@@ -454,7 +455,8 @@ export async function CFReportQuestions(req: Request, res: Response) {
 
 export async function ReportQuestions(req: Request, res: Response) {
     try {
-        const { term, sem, sec, facID, subcode, batch, branchInToken: branch } = req.body;
+        const { term, sem, sec, facID, subcode, batch, fbranch } = req.body;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
         const subjectType: any = await dbQuery(`SELECT qtype FROM subjects WHERE subcode = '${subcode}';`);
         const { qtype } = subjectType[0];
         let reportquestions: any;
