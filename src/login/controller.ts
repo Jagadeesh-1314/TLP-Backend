@@ -74,7 +74,6 @@ export async function isUserValid(req: Request, res: Response) {
     }
 
     const result: any = await dbQuery(query, [username]);
-    // console.log(result[0])
     if (result.length !== 1) {
       res.json({
         goahead: false,
@@ -83,27 +82,38 @@ export async function isUserValid(req: Request, res: Response) {
       return;
     }
 
+    
     const passwordHash = md5(password);
-
+    // console.log(password, md5(password), result[0]["password"])
+    
     if (passwordHash !== result[0]["password"]) {
       res.json({ goahead: false, error: "Incorrect password" });
       return;
     }
 
+    const passwordSameAsUsername = (password === username);
+
     const designation = userResult.length > 0 ? 'admin' : 'null';
 
     logger.log("info", `${username} has logged in from ${ip.slice(7)}`);
-    res.cookie("Token", generateToken(username, result[0]["branch"], result[0]["sem"]), { httpOnly: true });
-    res.json({
-      goahead: true,
-      username: result[0]["userName"],
-      displayName: result[0]["displayName"],
-      desg: designation,
-      branch: result[0]["branch"],
-      batch: result[0]["batch"],
-      sem: result[0]["sem"],
-      token: generateToken(username, result[0]["branch"], result[0]["sem"]),
-    });
+    res.cookie("Token", generateToken(username, result[0]["branch"], result[0]["sem"]), { httpOnly: true, secure: true, sameSite: "strict" });
+    // console.log(req.body)
+    // if (passwordSameAsUsername) {
+    //   res.json({ goahead: true, username: result[0]["userName"], displayName: result[0]["displayName"], passwordSameAsUsername: passwordSameAsUsername });
+    // }
+    // else {
+      res.json({
+        goahead: true,
+        username: result[0]["userName"],
+        displayName: result[0]["displayName"],
+        desg: designation,
+        branch: result[0]["branch"],
+        batch: result[0]["batch"],
+        sem: result[0]["sem"],
+        token: generateToken(username, result[0]["branch"], result[0]["sem"]),
+        passwordSameAsUsername: passwordSameAsUsername,
+      });
+    // }
   } catch (err) {
     logger.log("error", err);
     res.status(500).json({

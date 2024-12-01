@@ -1,13 +1,7 @@
 import { Response, Request } from "express";
 import dbQuery from "../services/db";
 import { responses } from "../services/common";
-import { detailsArr, detailsProps, facultyTableProps, questionsTableArr, subjectsDetailsProps, subjectTableProps } from "../interfaces/manage";
-interface ReportData {
-  facID: number;
-  facName: string;
-  sec: string;
-  totalScore: number;
-}
+import { questionsTableArr, subjectTableProps } from "../interfaces/manage";
 
 
 // Below are the common functionalites for managing studentInfo, Print and Paid entries
@@ -30,13 +24,16 @@ export async function getQuestions(req: Request, res: Response) {
 export async function getSubjects(req: Request, res: Response) {
   try {
     const username = req.body.usernameInToken;
+    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
+    const data: any = count;
+    const term = data.length > 0 ? data[0].count : null;
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
     }
     const subjects =
-      `SELECT sem, sec, branch, token FROM studentinfo WHERE rollno = TRIM('${username}')`
+      `SELECT sem, sec, branch, token${term} FROM studentinfo WHERE rollno = ?`
 
-    const subsresults: any = await dbQuery(subjects);
+    const subsresults: any = await dbQuery(subjects, [username]);
 
     if (subsresults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
@@ -63,44 +60,3 @@ export async function getSubjects(req: Request, res: Response) {
 }
 
 
-
-
-async function Lstn70() {
-  try {
-    for (let i = 1; i < 11; i++) {
-      const theoryquery = `
-        INSERT IGNORE INTO lstn70 (facID, subcode, sec, seq, avg)
-        SELECT ts.facID, ts.subcode, r.sec, 'q${i}', AVG(q${i})
-        FROM theoryscore1 ts
-        JOIN report1 r ON ts.facID = r.facID and ts.subcode = r.subcode
-        WHERE r.percentile <= 70
-        GROUP BY r.sec, ts.subcode;
-      `;
-
-      // Execute the query
-      const theoryresult: any = await dbQuery(theoryquery);
-      if (theoryresult.length === 0) {
-        return;
-      }
-    }
-    for (let i = 1; i < 9; i++) {
-      const labquery = `
-      INSERT IGNORE INTO lstn70 (facID, subcode, sec, seq, avg)
-      SELECT ls.facID, ls.subcode, r.sec, 'q${i}', AVG(q${i})
-      FROM labscore1 ls
-      JOIN report1 r ON ls.facID = r.facID and ls.subcode = r.subcode
-      WHERE r.percentile <= 70
-      GROUP BY r.sec, ls.subcode;
-    `;
-
-      // Execute the query
-      const labresult: any = await dbQuery(labquery);
-      if (labresult.length === 0) {
-        return;
-      }
-
-    }
-  } catch (e) {
-    console.log(e);
-  }
-}

@@ -5,6 +5,7 @@ import path from "path";
 import dbQuery from "../services/db";
 import * as logger from "../services/logger";
 import { responses } from "../services/common";
+import { format } from "date-fns/format";
 
 const supportedExtensions = [".xlsx", ".csv"];
 const tables = [
@@ -25,7 +26,7 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
           .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-          .concat( `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`)
+          .concat( `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`, '123123', `'${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}'`)
       )
       .map((row) => `(${row.join(",")})`);
   } else {
@@ -38,68 +39,54 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
           .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-          .concat(`'${branch}'`, `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`)
+          .concat(`'${branch}'`, `${parseInt(batch)}`, "'undone'", `md5('${row.split(",")[0]}')`, '123123', `'${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}'`)
       )
       .map((row) => `(${row.join(",")})`);
   }
 }
 
-function processCSVFaculty(data: string) {
-  return data
-    .trim()
-    .split("\n")
-    .map((row) =>
-      row
-        .trim()
-        .split(",")
-        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-    )
-    .map((row) => `(${row.join(",")})`);
-}
-
-function processCSVSubjects(data: string, subtype: string, def: string) {
-  return data
-    .trim()
-    .split("\n")
-    .map((row) =>
-      row
-        .trim()
-        .split(",")
-        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-    )
-    .map((row) => `(${row.join(",")})`);
-}
-
-
 function processCSVTimeTable(data: string, branch: string, username: string) {
   if (username === 'admin' || username === 'fmegcet') {
-  return data
-    .trim()
-    .split("\n")
-    .map((row) =>
-      row
-        .trim()
-        .split(",")
-        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-    )
-    .map((row) => `(${row.join(",")})`);
+    return data
+      .trim()
+      .split("\n")
+      .map((row) =>
+        row
+          .trim()
+          .split(",")
+          .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
+      )
+      .map((row) => `(${row.join(",")})`);
   } else {
     return data
-    .trim()
-    .split("\n")
-    .map((row) =>
-      row
-        .trim()
-        .split(",")
-        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-        .concat(`'${branch}'`)
-    )
-    .map((row) => `(${row.join(",")})`);
+      .trim()
+      .split("\n")
+      .map((row) =>
+        row
+          .trim()
+          .split(",")
+          .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
+          .concat(`'${branch}'`)
+      )
+      .map((row) => `(${row.join(",")})`);
   }
 }
 
+function processCSVFile(data: string) {
+  return data
+    .trim()
+    .split("\n")
+    .map((row) =>
+      row
+        .trim()
+        .split(",")
+        .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
+    )
+    .map((row) => `(${row.join(",")})`);
+}
 
-export async function uploadFromLoc(location: string, tableName: string, subtype: string, branch: string, batch: string, def: string, username: string) {
+
+export async function uploadFromLoc(location: string, tableName: string, branch: string, batch: string, username: string) {
   try {
     const workbook = xlsx.readFile(location);
     const sheetName = workbook.SheetNames[0];
@@ -114,28 +101,32 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
         const result = await dbQuery(query);
         logger.log("info", `Restoring ${tableName} done! \nWith result:`, result);
         return responses.DoneMSG;
-      }
-
-      else if (tableName === "faculty") {
-        const rows = processCSVFaculty(data);
+      } else if (tableName === "faculty") {
+        const rows = processCSVFile(data);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
         );
         logger.log("info", `Restoring ${tableName} done! \nWith result:`, result);
         return responses.DoneMSG;
-      }
-      else if (tableName === "subjects") {
-        const rows = processCSVSubjects(data, subtype, def);
+      } else if (tableName === "subjects") {
+        const rows = processCSVFile(data);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
         );
         logger.log("info", `Restoring ${tableName} done! \nWith result:`, result);
         return responses.DoneMSG;
-      }
-      else if (tableName === "timetable") {
+      } else if (tableName === "timetable") {
         const rows = processCSVTimeTable(data, branch, username);
+        let [_header, ...values] = rows;
+        const result = await dbQuery(
+          `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
+        );
+        logger.log("info", `Restoring ${tableName} done! \nWith result:`, result);
+        return responses.DoneMSG;
+      } else if (tableName === "electives") {
+        const rows = processCSVFile(data);
         let [_header, ...values] = rows;
         const result = await dbQuery(
           `INSERT IGNORE INTO ${tableName} VALUES ${values.join(", ")};`
@@ -160,11 +151,9 @@ export async function uploadFromLoc(location: string, tableName: string, subtype
 export const uploadFile = async (req: Request, res: Response) => {
   try {
     const { tableName } = req.params;
-    const subtype = req.body.subtype;
     const branch = req.body.branchInToken;
     const batch = req.body.batch;
     const username = req.body.usernameInToken;
-    const def = req.body.def;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     if (!files || !files['file'] || files['file'].length === 0) {
@@ -178,7 +167,7 @@ export const uploadFile = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Unsupported file format' });
     }
 
-    const result = await uploadFromLoc(file.path, `${tableName}`, `${subtype}`, `${branch}`, `${batch}`, `${def}`, `${username}`);
+    const result = await uploadFromLoc(file.path, `${tableName}`, `${branch}`, `${batch}`, `${username}`);
     if (result === responses.DoneMSG) {
       return res.json({ done: true });
     } else {

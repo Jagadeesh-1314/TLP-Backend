@@ -2,15 +2,14 @@ import { Router } from "express";
 
 import {
   getTable,
-  editStdDetails,
-  addStdDetails,
-  deleteStdDetails,
   addUser,
   deleteUser,
   updateUser,
-  getSubName,
   getUsers,
   branchDetails,
+  editDetails,
+  addDetails,
+  deleteDetails,
 } from "./controller";
 
 const router: Router = Router();
@@ -20,6 +19,9 @@ router.get("/table", getTable);
 
 // Getting Branches
 router.get("/branchdetails", branchDetails);
+router.post("/database", addDetails);
+router.patch("/database", editDetails);
+router.delete("/database", deleteDetails);
 
 // Getting Users
 router.get("/users", getUsers);
