@@ -33,7 +33,8 @@ export async function getTable(req: Request, res: Response) {
           FROM timetable t
           JOIN faculty f ON t.facID = f.facID
           JOIN subjects s ON s.subCode = t.subCode
-          WHERE branch = '${branch}';
+          WHERE branch = '${branch}' 
+          ORDER BY sem, sec;
         `;
       }
 

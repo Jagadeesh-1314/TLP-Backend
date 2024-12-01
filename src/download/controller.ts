@@ -434,7 +434,7 @@ export async function unfilledstudents(req: Request, res: Response) {
     let i: number = Math.floor(Number(sem) / 2);
     let j: number = (Math.floor(Number(sem) % 2) != 0) ? 1 : 2;
     const secCondition = sec ? `AND sec = '${sec}'` : "";
-    const semCondition = sem ? `AND sem = ${sem}` : "";
+    const semCondition = sem === null ? `AND sem = ${sem}` : "";
     const tokenCondition = `token${term} != 'done'`;
 
     const query: string = `
@@ -443,7 +443,8 @@ export async function unfilledstudents(req: Request, res: Response) {
         WHERE ${tokenCondition}
         ${secCondition}
         ${semCondition}
-        AND branch = ?;
+        AND branch = ?
+        ORDER BY sem, sec;
     `;
 
     const result: any = await dbQuery(query, [branchControl]);
