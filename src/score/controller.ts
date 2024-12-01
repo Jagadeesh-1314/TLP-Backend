@@ -166,7 +166,7 @@ export async function postScore(req: Request, res: Response) {
     const userQuery = `SELECT sem, sec, branch, batch FROM studentinfo WHERE rollno = TRIM('${username}')`;
     const userResults: any = await dbQuery(userQuery);
     const countData: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const { count } = countData[0];
+    const { term } = countData[0];
 
     if (userResults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
@@ -223,7 +223,7 @@ export async function postScore(req: Request, res: Response) {
         totalScore = scoreValues.reduce((acc, val) => acc + val, 0) / scoreValues.length;
 
         const theoryQuery = `
-          INSERT INTO theoryscore${count} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, score, batch)
+          INSERT INTO theoryscore${term} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, score, batch)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const queryParams = [username, facID, subCode, sem, ...scoreValues, totalScore, batch];
@@ -238,7 +238,7 @@ export async function postScore(req: Request, res: Response) {
         totalScore = scoreValues.reduce((acc, val) => acc + val, 0) / scoreValues.length;
 
         const labQuery = `
-          INSERT INTO labscore${count} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, score, batch)
+          INSERT INTO labscore${term} (rollno, facID, subcode, sem, q1, q2, q3, q4, q5, q6, q7, q8, score, batch)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const queryParams = [username, facID, subCode, sem, ...scoreValues, totalScore, batch];
@@ -263,7 +263,7 @@ export async function postScore(req: Request, res: Response) {
     const results: any = await Promise.all(executeBatch);
     const allProtocol41 = results.every((result: { protocol41: boolean }) => result.protocol41);
     if (allProtocol41) {
-      const tokenQuery = `UPDATE studentinfo SET token = 'facdone' WHERE rollno = (?)`;
+      const tokenQuery = `UPDATE studentinfo SET token${term} = 'facdone' WHERE rollno = (?)`;
       await dbQuery(tokenQuery, [username]);  
       return res.json({ done: true });
     }
@@ -280,7 +280,7 @@ export async function cfScore(req: Request, res: Response) {
     const { scores } = req.body;
     const username = req.body.usernameInToken;
     const data: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const { count } = data[0];
+    const { term } = data[0];
     const userQuery = `SELECT sem, branch, batch, token FROM studentinfo WHERE rollno = TRIM(?)`;
     const userResults: any = await dbQuery(userQuery, [username]);
 
@@ -305,12 +305,12 @@ export async function cfScore(req: Request, res: Response) {
     const totalScore = scoreValues.reduce((acc, val) => acc + val, 0) / scoreValues.length;
 
     const query = `
-        INSERT INTO cf${count} (rollno, branch, batch, sem, q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, score)
+        INSERT INTO cf${term} (rollno, branch, batch, sem, q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, score)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `;
     const results: any = await dbQuery(query, [username, branch, batch, sem, ...scoreValues, totalScore]);
     if (results.protocol41) {
-      const token = `UPDATE studentinfo SET token = 'done' WHERE rollno = (?)`
+      const token = `UPDATE studentinfo SET token${term} = 'done' WHERE rollno = (?)`
       await dbQuery(token, [username]);
       return res.json({ done: true });
     }

@@ -14,12 +14,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function getAllRollNumbers(): Promise<string[]> {
+async function getAllRollNumbers(): Promise<{ rollno: string; name: string }[]> {
   try {
-    const query = `SELECT rollno FROM studentinfo`;
-    // Mocking data for now
-    const result = ['21R11A05L0']; // Mock data for roll numbers
-    return result.map((row: any) => `22tq1a6730@siddhartha.co.in`);
+    const query = `SELECT rollno, name FROM studentinfo'`;
+    const result = await dbQuery(query);
+
+    return result.map((row: any) => ({
+      rollno: row.rollno,
+      name: row.name,
+    }));
   } catch (error) {
     logger.log("error", `Failed to fetch roll numbers: ${error}`);
     throw new Error("Database error");
@@ -28,38 +31,43 @@ async function getAllRollNumbers(): Promise<string[]> {
 
 async function sendEmails() {
   try {
-    const emailList = await getAllRollNumbers();
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: emailList,
-      subject: "Important: Visit the Feedback Application",
-      html: `
-        <p>Dear Student,</p>
+    const studentList = await getAllRollNumbers();
 
-        <p>We are excited to introduce <strong>TLP - Teach Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
+    for (const student of studentList) {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: `${student.rollno}@gcet.edu.in`,
+        subject: "Important: Visit the Feedback Application",
+        html: `
+          <p>Dear ${student.name},</p>
 
-        <h4>Why TLP?</h4>
-        <ul>
-          <li>Streamlines feedback between students and teachers.</li>
-          <li>Provides insights for improving teaching strategies.</li>
-          <li>Delivers detailed performance analytics.</li>
-          <li>Simple, user-friendly interface.</li>
-        </ul>
+          <p>We are excited to introduce <strong>TLP - Teach Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
 
-        <h4>To get started, please visit the feedback application at:</h4>
-        <p><a href="https://tlpgcet.github.io" target="_blank">https://tlpgcet.github.io</a></p>
+          <h4>Why TLP?</h4>
+          <ul>
+            <li>Streamlines feedback between students and teachers.</li>
+            <li>Provides insights for improving teaching strategies.</li>
+            <li>Delivers detailed performance analytics.</li>
+            <li>Simple, user-friendly interface.</li>
+          </ul>
 
-        <p>We look forward to your feedback.</p>
+          <h4>To get started, please visit the feedback application at:</h4>
+          <p><a href="https://tlpgcet.github.io" target="_blank">https://tlpgcet.github.io</a></p>
 
-        <p>Thank you for your time and support in advancing the education process.</p>
+          <p>We look forward to your feedback.</p>
 
-        <p>Best regards,<br>
-        TLP Team</p>
-      `,
-    };
+          <p>Thank you for your time and support in advancing the education process.</p>
 
-    await transporter.sendMail(mailOptions);
-    logger.log("info", `Emails sent to all students at ${new Date().toLocaleTimeString()}`);
+          <p>Best regards,<br>
+          TLP Team</p>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      logger.log("info", `Email sent to ${student.name} at ${student.rollno}@gcet.edu.in`);
+    }
+
+    logger.log("info", `All emails sent successfully at ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     logger.log("error", `Failed to send emails: ${error}`);
   }
@@ -73,7 +81,6 @@ const timeSlots = [
   { hour: 12, minute: 30 },
   { hour: 16, minute: 30 },
   { hour: 21, minute: 0 },
-  { hour: 14, minute: 51 }
 ];
 
 // Function to handle dynamic scheduling based on date range
