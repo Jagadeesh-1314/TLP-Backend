@@ -11,13 +11,14 @@ import report from "./report";
 import score from "./score";
 import electives from "./electives";
 import statuslist from "./statuslist";
+import setnewpassword from "./setpassword";
 
 const router = Router();
 
 router.use("/", loginRouter);
+router.use("/", setnewpassword);
 
 router.use(verifyToken); 
-
 
 router.use("/", ques);
 router.use("/", token);
