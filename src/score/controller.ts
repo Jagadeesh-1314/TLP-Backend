@@ -165,8 +165,9 @@ export async function postScore(req: Request, res: Response) {
     const username = req.body.usernameInToken;
     const userQuery = `SELECT sem, sec, branch, batch FROM studentinfo WHERE rollno = TRIM('${username}')`;
     const userResults: any = await dbQuery(userQuery);
-    const countData: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const { term } = countData[0];
+    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
+    const data: any = count;
+    const term = data.length > 0 ? data[0].count : null;
 
     if (userResults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
@@ -258,16 +259,16 @@ export async function postScore(req: Request, res: Response) {
     //   return substitutedQuery;
     // });
     // console.log(substitutedQueries);
-    
+
     const executeBatch = allParamsArray.map(({ query, params }) => dbQuery(query, params));
     const results: any = await Promise.all(executeBatch);
     const allProtocol41 = results.every((result: { protocol41: boolean }) => result.protocol41);
     if (allProtocol41) {
       const tokenQuery = `UPDATE studentinfo SET token${term} = 'facdone' WHERE rollno = (?)`;
-      await dbQuery(tokenQuery, [username]);  
+      await dbQuery(tokenQuery, [username]);
       return res.json({ done: true });
     }
-    return res.json({ done : false })
+    return res.json({ done: false })
   } catch (err) {
     console.error("Error while inserting score:", err);
     return res.status(500).json({ error: "Internal Server Error" });
@@ -279,8 +280,9 @@ export async function cfScore(req: Request, res: Response) {
   try {
     const { scores } = req.body;
     const username = req.body.usernameInToken;
-    const data: any = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const { term } = data[0];
+    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
+    const data: any = count;
+    const term = data.length > 0 ? data[0].count : null;
     const userQuery = `SELECT sem, branch, batch, token FROM studentinfo WHERE rollno = TRIM(?)`;
     const userResults: any = await dbQuery(userQuery, [username]);
 
@@ -289,7 +291,7 @@ export async function cfScore(req: Request, res: Response) {
     }
     const { sem, branch, batch, token } = userResults[0];
 
-    if(token === 'undone'){
+    if (token === 'undone') {
       res.json({ done: false, error: 'You should do Subjects Feedback First' });
       return;
     }
