@@ -283,7 +283,7 @@ export async function cfScore(req: Request, res: Response) {
     const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
     const data: any = count;
     const term = data.length > 0 ? data[0].count : null;
-    const userQuery = `SELECT sem, branch, batch, token FROM studentinfo WHERE rollno = TRIM(?)`;
+    const userQuery = `SELECT sem, branch, batch, token${term} FROM studentinfo WHERE rollno = TRIM(?)`;
     const userResults: any = await dbQuery(userQuery, [username]);
 
     if (userResults.length === 0) {
