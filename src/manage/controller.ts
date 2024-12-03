@@ -105,6 +105,9 @@ export async function branchDetails(req: Request, res: Response) {
 
 export async function editDetails(req: Request, res: Response) {
   try {
+    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
+    const data: any = count;
+    const term = data.length > 0 ? data[0].count : null;
     const validTableNames: tableNames[] = [
       "faculty",
       "studentinfo",
@@ -151,7 +154,21 @@ export async function editDetails(req: Request, res: Response) {
     }
 
     if (tableName === "timetable") {
-      // TODO EDIT
+      const query = `
+        UPDATE timetable
+        SET facID = ?
+        WHERE subCode = ?
+          AND sem = ?
+          AND sec = ?
+          AND branch = ?;
+      `;
+      const values = [
+        details.facID,
+        details.subCode,
+        details.sem,
+        details.sec,
+        details.branch
+      ];
 
     } else if (tableName === "studentinfo") {
       const query = `
@@ -456,7 +473,7 @@ export async function deleteDetails(req: Request, res: Response) {
         // }
         // const facIDList = facIDs.map(fac => `'${fac}'`).join(', ');
         // const subCodeList = subCodes.map(code => `'${code}'`).join(', ');
-        deleteQuery = `DELETE FROM timetable WHERE facID = ('${facID}') AND subCode = ('${subCode}') AND sem=${sem} AND sec='${sec}' AND branch='${branch}' AND batch=${batch};`;
+        deleteQuery = `DELETE FROM timetable WHERE facID = ('${facID}') AND subCode = ('${subCode}') AND sem=${sem} AND sec='${sec}' AND branch='${branch}';`;
         break;
 
       case "subjects":
