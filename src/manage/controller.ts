@@ -169,6 +169,11 @@ export async function editDetails(req: Request, res: Response) {
         details.sec,
         details.branch
       ];
+      const result: any = await dbQuery(query, values);
+      if (result.protocol41) {
+        return res.json({ updated: true });
+      }
+      return res.status(500).json({ message: "Internal Server Error" });
 
     } else if (tableName === "studentinfo") {
       const query = `
@@ -250,12 +255,12 @@ export async function editDetails(req: Request, res: Response) {
         details.subcode
       ];
 
+
       const result: any = await dbQuery(query, values);
       if (result.protocol41) {
         return res.json({ updated: true });
       }
       return res.status(500).json({ message: "Internal Server Error" })
-
     }
     // return res.json({ updated: true });
 
