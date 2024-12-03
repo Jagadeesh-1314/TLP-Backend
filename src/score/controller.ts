@@ -318,7 +318,6 @@ export async function cfScore(req: Request, res: Response) {
     }
     return res.json({ done: false });
   } catch (err) {
-    console.error("Error while inserting score:", err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
