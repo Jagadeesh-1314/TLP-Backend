@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { Response, Request } from "express";
 import nodemailer from "nodemailer";
 import * as logger from "./../services/logger";
-import { addMinutes, format, parse } from 'date-fns';
+import { addDays, addMinutes, format, parse } from 'date-fns';
 import md5 from "md5";
 import dbQuery from "../services/db";
 
@@ -14,30 +14,39 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function getAllRollNumbers(): Promise<{ rollno: string; name: string }[]> {
+// Constant time slots (example: 8:30 AM, 12:30 PM, etc.)
+const timeSlots = [
+  { hour: 8, minute: 30 },
+  { hour: 12, minute: 30 },
+  { hour: 16, minute: 30 },
+  { hour: 21, minute: 0 },
+  { hour: 11, minute: 54 },
+];
+
+async function getAllRollNumbers(branches: string[]): Promise<{ rollno: string; name: string }[]> {
   try {
-    const query = `SELECT rollno, name FROM studentinfo'`;
-    const result = await dbQuery(query);
+    const query = `SELECT rollno, name FROM studentinfo WHERE branch IN (?)`;
+    const result = await dbQuery(query, [branches]);
 
     return result.map((row: any) => ({
       rollno: row.rollno,
       name: row.name,
     }));
   } catch (error) {
-    logger.log("error", `Failed to fetch roll numbers: ${error}`);
-    throw new Error("Database error");
+    logger.log('error', `Failed to fetch roll numbers: ${error}`);
+    throw new Error('Database error');
   }
 }
 
-async function sendEmails() {
+async function sendEmails(branches: string[]) {
   try {
-    const studentList = await getAllRollNumbers();
+    const studentList = await getAllRollNumbers(branches);
 
     for (const student of studentList) {
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to: `${student.rollno}@gcet.edu.in`,
-        subject: "Important: Visit the Feedback Application",
+        subject: 'Important: Visit the Feedback Application',
         html: `
           <p>Dear ${student.name},</p>
 
@@ -64,55 +73,61 @@ async function sendEmails() {
       };
 
       await transporter.sendMail(mailOptions);
-      logger.log("info", `Email sent to ${student.name} at ${student.rollno}@gcet.edu.in`);
+      logger.log('info', `Email sent to ${student.name} at ${student.rollno}@gcet.edu.in`);
     }
 
-    logger.log("info", `All emails sent successfully at ${new Date().toLocaleTimeString()}`);
+    logger.log('info', 'All emails sent successfully');
   } catch (error) {
-    logger.log("error", `Failed to send emails: ${error}`);
+    logger.log('error', `Failed to send emails: ${error}`);
   }
 }
 
-
-
-// Constant time slots (example: 8:30 AM, 12:30 PM, etc.)
-const timeSlots = [
-  { hour: 8, minute: 30 },
-  { hour: 12, minute: 30 },
-  { hour: 16, minute: 30 },
-  { hour: 21, minute: 0 },
-];
-
 // Function to handle dynamic scheduling based on date range
 export async function scheduleEmails(req: Request, res: Response) {
-  const { startDate, endDate } = req.body;
+  const { startDate, endDate, branches } = req.body;
+  console.log(startDate, endDate, branches);
 
-  // Validate date range format (yyyy-mm-dd)
+  if (!Array.isArray(branches) || branches.length === 0) {
+    return res.status(400).json({ error: 'Invalid branches provided' });
+  }
+
   const start = parse(startDate, 'yyyy-MM-dd', new Date());
   const end = parse(endDate, 'yyyy-MM-dd', new Date());
 
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    return res.status(400).json({ error: "Invalid date format. Use yyyy-mm-dd." });
+    return res.status(400).json({ error: 'Invalid date format. Use yyyy-MM-dd.' });
   }
 
-  // Clear existing cron jobs (if any) before creating new ones
-  cron.getTasks().forEach(task => task.stop());
+  if (start > end) {
+    return res.status(400).json({ error: 'Start date must be before or equal to end date.' });
+  }
 
-  // Loop through the date range and schedule emails for each date
+  // Clear existing cron jobs (if any)
+  cron.getTasks().forEach(task => task.stop());
+  logger.log('info', 'Cleared existing cron jobs.');
+
   let currentDate = start;
+
   while (currentDate <= end) {
-    // Schedule tasks based on constant time slots for the current date
-    timeSlots.forEach((slot: { hour: number, minute: number }) => {
-      const cronExpression = `${slot.minute} ${slot.hour} ${currentDate.getDate()} ${currentDate.getMonth() + 1} *`;
-      cron.schedule(cronExpression, sendEmails);
-      logger.log("info", `Scheduled email task for ${format(currentDate, 'yyyy-MM-dd')} at ${slot.hour}:${slot.minute}`);
+    timeSlots.forEach(({ hour, minute }) => {
+      const cronExpression = `${minute} ${hour} ${currentDate.getDate()} ${currentDate.getMonth() + 1} *`;
+
+      cron.schedule(cronExpression, async () => {
+        try {
+          await sendEmails(branches);
+          logger.log('info', `Emails sent for ${branches} at ${hour}:${minute}`);
+        } catch (error) {
+          logger.log('error', `Error in scheduled task: ${error}`);
+        }
+      });
     });
 
     // Move to the next date
-    currentDate = addMinutes(currentDate, 24 * 60);
+    currentDate = addDays(currentDate, 1);
   }
+  logger.log('info', `Scheduled task from ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
 
-  return res.json({ success: true, message: "Email tasks scheduled successfully" });
+  return res.json({ success: true, message: 'Email tasks scheduled successfully' });
 }
 
 // OTP-related functions
