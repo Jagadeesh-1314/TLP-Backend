@@ -62,7 +62,7 @@ export async function getTable(req: Request, res: Response) {
 
       if (tableName !== 'faculty' && tableName !== 'subjects') {
         const semCondition =
-          req.body.branchInToken === 'FME' ? 'sem IN (1, 2)' : 'sem NOT IN (1, 2)';
+          req.body.branchInToken === 'FME' || req.body.branchInToken === 'MBA' ? 'sem IN (1, 2)' : 'sem NOT IN (1, 2)';
         return `
           SELECT * FROM ${tableName}
           WHERE branch = '${branch}' AND ${semCondition}

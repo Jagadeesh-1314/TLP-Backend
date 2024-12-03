@@ -20,7 +20,6 @@ const timeSlots = [
   { hour: 12, minute: 30 },
   { hour: 16, minute: 30 },
   { hour: 21, minute: 0 },
-  { hour: 11, minute: 54 },
 ];
 
 async function getAllRollNumbers(branches: string[]): Promise<{ rollno: string; name: string }[]> {
