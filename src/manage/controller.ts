@@ -306,17 +306,17 @@ export async function addDetails(req: Request, res: Response) {
   //   return res.status(400).json({ message: "Invalid table name" });
   // }
 
-  const currentYear = new Date().getFullYear();
+  // const currentYear = new Date().getFullYear();
 
-  if (details.batch !== undefined && typeof details.batch === 'string') {
-    const parsedBatch = parseInt(details.batch, 10);
+  // if (details.batch !== undefined && typeof details.batch === 'string') {
+  //   const parsedBatch = parseInt(details.batch, 10);
 
-    if (parsedBatch >= currentYear - 3 && parsedBatch <= currentYear) {
-      details.batch = parsedBatch;
-    } else {
-      return res.status(400).json({ message: "Batch year must be between " + (currentYear - 3) + " and " + currentYear + "." });
-    }
-  }
+  //   if (parsedBatch >= currentYear - 3 && parsedBatch <= currentYear) {
+  //     details.batch = parsedBatch;
+  //   } else {
+  //     return res.status(400).json({ message: "Batch year must be between " + (currentYear - 3) + " and " + currentYear + "." });
+  //   }
+  // }
 
   if (details.sem !== undefined && typeof details.sem === 'string') {
     const parsedSem = parseInt(details.sem, 10);
@@ -390,7 +390,7 @@ export async function addDetails(req: Request, res: Response) {
       if (result[0].protocol41) {
         return res.json({ done: true });
       }
-      // return res.status(500).json({ message: "Internal Server Error" });
+      return res.status(500).json({ message: "Internal Server Error" });
 
     } else if (tableName === "studentinfo") {
       const query: string = `INSERT INTO studentinfo (rollno, Name, sec, sem, branch, batch, token, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
