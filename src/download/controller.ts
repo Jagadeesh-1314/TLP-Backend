@@ -447,8 +447,6 @@ export async function unfilledstudents(req: Request, res: Response) {
         ORDER BY sem, sec;
     `;
 
-    console.log(query);
-
     const result: any = await dbQuery(query, [branchControl]);
 
     const groupedStudents = result.reduce((groups: { [x: string]: any[]; }, student: { sem: any; sec: any; }) => {
