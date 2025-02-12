@@ -6,4 +6,5 @@ const router: Router = Router();
 router.post("/token", token);
 router.get("/fetchterm", fetchTerm);
 
+
 export default router;

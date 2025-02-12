@@ -21,6 +21,7 @@ router.use("/", setnewpassword);
 router.use(verifyToken); 
 
 router.use("/", ques);
+// In token i have added the fecch term function
 router.use("/", token);
 router.use("/", score);
 

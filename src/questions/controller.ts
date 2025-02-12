@@ -24,24 +24,25 @@ export async function getQuestions(req: Request, res: Response) {
 export async function getSubjects(req: Request, res: Response) {
   try {
     const username = req.body.usernameInToken;
-    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const data: any = count;
-    const term = data.length > 0 ? data[0].count : null;
+    const branchInToken = req.body.branchInToken;
+
     if (!username) {
       return res.status(400).json({ error: "Username is required" });
     }
-    const subjects =
-      `SELECT sem, sec, branch, token${term} FROM studentinfo WHERE rollno = ?`
 
-    const subsresults: any = await dbQuery(subjects, [username]);
+    // Fetch student details
+    const subjectsQuery = `SELECT sem, sec, branch FROM studentinfo WHERE rollno = ?`;
+    const subsresults: any = await dbQuery(subjectsQuery, [username]);
 
     if (subsresults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
     }
 
     const { sem, sec, branch } = subsresults[0];
+
+    // Fetch subjects
     const query =
-      `SELECT t1.subcode, subjects.subname, t1.facID, f.facName, subjects.qtype
+      ` SELECT t1.subcode, subjects.subname, t1.facID, f.facName, subjects.qtype
       FROM (SELECT * FROM timetable WHERE sem = TRIM(?) AND sec = TRIM(?) AND branch = TRIM(?)) AS t1
       INNER JOIN subjects ON TRIM(t1.subcode) = TRIM(subjects.subcode)
       INNER JOIN faculty f ON TRIM(t1.facID) = TRIM(f.facID)
@@ -50,11 +51,26 @@ export async function getSubjects(req: Request, res: Response) {
       FROM electives e
       INNER JOIN faculty f ON TRIM(e.facID) = TRIM(f.facID)
       INNER JOIN subjects ON TRIM(e.subcode) = TRIM(subjects.subcode)
-      WHERE TRIM(e.rollno) = TRIM(?) ORDER BY subcode;`
+      WHERE TRIM(e.rollno) = TRIM(?) ORDER BY subcode;
+    `;
     const subs = await dbQuery(query, [sem, sec, branch, username]) as subjectTableProps;
-    return res.json({ sub: subs });
+
+    const isFmeActive = ((sem === 1 || sem === 2) && branch !== 'MBA') ? await (async () => {
+      const fmeQuery = `SELECT status FROM term WHERE branch = 'FME'`;
+      const fmeResult = await dbQuery(fmeQuery);
+      return fmeResult.length > 0 && fmeResult[0].status === 'active';
+    })() : false;
+
+    const termQuery = `SELECT status FROM term WHERE branch = ?`;
+    const termResult = await dbQuery(termQuery, [branchInToken]);
+
+    const term = termResult.length > 0 ? termResult[0].status : null;
+    const finalStatus = (isFmeActive ? 'active' : term);
+
+    return res.json({ sub: subs, status: finalStatus });
+
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }

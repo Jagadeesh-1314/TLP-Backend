@@ -3,10 +3,11 @@ import dbQuery from "../services/db";
 
 export async function secList(req: Request, res: Response) {
     try {
-        const { batch, sem, fbranch } = req.body;
-        const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const { term, sem, batch, fbranch } = req.body;
+        const defterm = term === 0 ? 1 : term;
+        const branchControl = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
         const query = (`
-            SELECT DISTINCT sec FROM report1 WHERE branch = ? AND batch = ? AND sem = ?;
+            SELECT DISTINCT sec FROM report${defterm} WHERE branch = ? AND batch = ? AND sem = ?;
             `);
         const secList: any = await dbQuery(query, [branchControl, batch, sem]);
         return res.json({ secList: secList });
@@ -16,11 +17,14 @@ export async function secList(req: Request, res: Response) {
     }
 }
 
+
+//  Generate Reports
 export async function report(req: Request, res: Response) {
     try {
         // TODO: fbranch check in manage db branch route
         const { fbranch, term } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const branch = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
+
         if (parseInt(term) !== 0) {
 
             const theoryQuery = `
@@ -133,12 +137,9 @@ export async function report(req: Request, res: Response) {
                     total_students
                 ]);
             }
-            let query: string;
-            if (req.body.branchInToken === 'FME') {
-                query = (`SELECT sem, batch, branch FROM report1 where sem = ? GROUP BY sem, batch, branch;`)
-            } else {
-                query = (`SELECT sem, batch FROM report${term} GROUP BY sem, batch;`);
-            }
+            const query: string = req.body.branchInToken === 'FME'
+                ? `SELECT sem, batch, branch FROM report${term} where sem IN (1, 2) GROUP BY sem, batch, branch;`
+                : `SELECT sem, batch FROM report${term} GROUP BY sem, batch;`;
             const details: any = await dbQuery(query, [term])
             if (details.length === 0) {
                 return res.json({ done: false });
@@ -153,16 +154,23 @@ export async function report(req: Request, res: Response) {
 
 export async function cfreport(req: Request, res: Response) {
     try {
-        const { fbranch, term } = req.body;
+        const { fbranch, term, sem, startYear, endYear } = req.body;
         const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
-        const cfquery = `
-       SELECT COUNT(si.batch) as count, cf.branch, cf.batch, si.sem,
-                  SUM(cf.score) as totalScore
-                  FROM cf${term} cf
-                  JOIN studentinfo si ON cf.rollno = si.rollno AND cf.sem = si.sem
-                  WHERE cf.branch = ?
-                  GROUP BY cf.branch, cf.batch, cf.sem;
-      `;
+        const cfquery = (req.body.usernameInToken !== 'admin') ? `
+            SELECT COUNT(si.batch) as count, cf.branch, cf.batch, si.sem,
+            SUM(cf.score) as totalScore
+            FROM cf${term} cf
+            JOIN studentinfo si ON cf.rollno = si.rollno AND cf.sem = si.sem
+            WHERE cf.branch = ?
+            GROUP BY cf.branch, cf.batch, cf.sem;
+      ` : `
+            SELECT COUNT(si.batch) as count, cf.branch, cf.batch, si.sem,
+            SUM(cf.score) as totalScore
+            FROM cf${term} cf
+            JOIN studentinfo si ON cf.rollno = si.rollno AND cf.sem = si.sem
+            GROUP BY cf.branch, cf.batch, cf.sem
+		    ORDER BY cf.sem;
+        `;
 
         // Execute the query
         const result: any = await dbQuery(cfquery, [branch]);
@@ -175,10 +183,10 @@ export async function cfreport(req: Request, res: Response) {
         for (const row of data) {
             const { count, branch, batch, sem, totalScore } = row;
             const cfreport = `
-          INSERT INTO cfreport${term} (branch, batch, sem, percentile)
-          VALUES (?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-          percentile = VALUES(percentile)
+                INSERT INTO cfreport${term} (branch, batch, sem, percentile)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                percentile = VALUES(percentile)
         `;
 
             await dbQuery(cfreport, [
@@ -188,8 +196,33 @@ export async function cfreport(req: Request, res: Response) {
                 (totalScore / count) * 20,
             ]);
         }
-        const query = (`SELECT batch, branch, sem FROM cfreport${term} WHERE branch=? GROUP BY batch, branch, sem;`);
-        const details: any = await dbQuery(query, [branch]);
+        const query = (req.body.usernameInToken !== 'admin')
+            ? `SELECT batch, branch, sem FROM cfreport${term} WHERE branch=? GROUP BY batch, branch, sem;`
+            : `SELECT branch, 
+                CASE 
+                    WHEN sem IN (1, 3, 5, 7) THEN 'Odd'
+                    ELSE 'Even'
+                END AS sem_type,
+                AVG(percentile) AS percentile FROM cfreport${term} WHERE batch BETWEEN ? AND ? AND sem IN (?) 
+                GROUP BY branch, sem_type
+                UNION ALL
+                SELECT 'Overall' AS branch, 
+                CASE 
+                    WHEN sem IN (1, 3, 5, 7) THEN 'Odd'
+                    ELSE 'Even'
+                END AS sem_type,
+                AVG(percentile) AS percentile FROM cfreport${term} WHERE batch BETWEEN ? AND ? AND sem IN (?)
+                GROUP BY sem_type;
+            `;
+
+        const params = (req.body.usernameInToken !== 'admin')
+            ? [branch]
+            : [startYear, endYear, sem, startYear, endYear, sem];
+
+        const details: any = await dbQuery(query, params);
+        if (details.length === 0) {
+            return res.json({ done: false });
+        }
         return res.json({ done: true, details: details });
     } catch (err) {
         console.error("Error while inserting score:", err);
@@ -197,10 +230,11 @@ export async function cfreport(req: Request, res: Response) {
     }
 }
 
+//  Fetch Reports
 export async function fetchReport(req: Request, res: Response) {
     try {
         const { term, batch, sec, sem, fbranch } = req.body;
-        const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const branchControl = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
         const query: string = (`
             SELECT report${term}.*, subjects.subname FROM report${term} JOIN subjects ON report${term}.subcode = subjects.subcode 
             WHERE batch=? AND sem=? AND sec=? AND branch=? ORDER BY subjects.subCode ;
@@ -213,66 +247,14 @@ export async function fetchReport(req: Request, res: Response) {
     }
 }
 
-export async function fetchReportAverage(req: Request, res: Response) {
-    try {
-        const { batch, sec, sem, fbranch } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
-
-        const query: string = (`
-            SELECT 
-                r1.facID,
-                f.facName,
-                r1.subcode,
-                s.subname,
-                r1.sem,
-                r1.sec,
-                r1.batch,
-                r1.branch,
-                r1.percentile AS percentile1,
-                r2.percentile AS percentile2,
-                ROUND((AVG(COALESCE(r1.percentile, 0)) + AVG(COALESCE(r2.percentile, 0))) / 2, 4) AS percentile
-            FROM 
-                report1 r1
-            JOIN 
-                report2 r2
-                ON r1.facID = r2.facID
-                AND r1.subcode = r2.subcode
-                AND r1.sec = r2.sec
-                AND r1.sem = r2.sem
-                AND r1.batch = r2.batch
-                AND r1.branch = r2.branch
-            JOIN 
-                faculty f
-                ON f.facID = r1.facID
-            JOIN 
-                subjects s
-                ON s.subcode = r1.subcode            
-            WHERE 
-                r1.branch = ?
-                AND r1.sem = ?
-                AND r1.sec = ? 
-                AND r1.batch = ?
-            GROUP BY 
-                r1.sem, r1.sec, r1.batch, r1.branch, r1.facID, r1.subcode
-            ORDER BY
-                r1.subcode;
-        `);
-        const report: any = await dbQuery(query, [branch, sem, sec, batch]);
-        return res.json({ report: report });
-    } catch (error) {
-        console.error('Error executing query:', error);
-        res.status(500).send('Error executing query');
-    }
-}
-
 export async function fetchCFReport(req: Request, res: Response) {
     try {
         const { term, batch, fbranch, sem } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
-        const query: any = (`
+        const branch = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
+        const query = (`
             SELECT * FROM cfreport${term} where batch=? AND branch=? AND sem = ?;
         `);
-        const cfreport: any = await dbQuery(query, [batch, branch, sem]);
+        const cfreport = await dbQuery(query, [batch, branch, sem]);
         return res.json({ cfreport: cfreport });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -280,126 +262,7 @@ export async function fetchCFReport(req: Request, res: Response) {
     }
 }
 
-export async function CFReportQuestions(req: Request, res: Response) {
-    try {
-        const { term, sem, batch, fbranch } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
-        const query: string = (`
-                            WITH QuestionText AS (
-                    SELECT 
-                        'Employability Skills' AS qtext, 0 AS seq
-                    UNION ALL
-                    SELECT 
-                        'Mentoring support', 1
-                    UNION ALL
-                    SELECT 
-                        'Campus Placement Efforts', 2
-                    UNION ALL
-                    SELECT 
-                        'Career and academic guidance', 3
-                    UNION ALL
-                    SELECT 
-                        'Leadership of the college', 4
-                    UNION ALL
-                    SELECT 
-                        'Soft skills and Personality Development', 5
-                    UNION ALL
-                    SELECT 
-                        'Library Facilities', 6
-                    UNION ALL
-                    SELECT 
-                        'Extracurricular activities', 7
-                    UNION ALL
-                    SELECT 
-                        'Co-curricular activities', 8
-                    UNION ALL
-                    SELECT 
-                        'College transport facilities', 9
-                    UNION ALL
-                    SELECT 
-                        'Service in Academic Section', 10
-                    UNION ALL
-                    SELECT 
-                        'Service in Exam Branch', 11
-                    UNION ALL
-                    SELECT 
-                        'Service in Accounts Section', 12
-                    UNION ALL
-                    SELECT 
-                        'Physical Education Facilities', 13
-                    UNION ALL
-                    SELECT 
-                        'Quality of food in Canteen', 14
-                    UNION ALL
-                    SELECT 
-                        'Service in the Canteen', 15
-                    UNION ALL
-                    SELECT 
-                        'Overall opinion of GCET', 16
-                )
-                SELECT 
-                    qt.qtext AS question, 
-                    branch, 
-                    sem, 
-                    COUNT(*) AS count,
-                    CASE qt.seq
-                        WHEN 0 THEN AVG(q0)
-                        WHEN 1 THEN AVG(q1)
-                        WHEN 2 THEN AVG(q2)
-                        WHEN 3 THEN AVG(q3)
-                        WHEN 4 THEN AVG(q4)
-                        WHEN 5 THEN AVG(q5)
-                        WHEN 6 THEN AVG(q6)
-                        WHEN 7 THEN AVG(q7)
-                        WHEN 8 THEN AVG(q8)
-                        WHEN 9 THEN AVG(q9)
-                        WHEN 10 THEN AVG(q10)
-                        WHEN 11 THEN AVG(q11)
-                        WHEN 12 THEN AVG(q12)
-                        WHEN 13 THEN AVG(q13)
-                        WHEN 14 THEN AVG(q14)
-                        WHEN 15 THEN AVG(q15)
-                        WHEN 16 THEN AVG(q16)
-                    END AS total,
-                    ROUND(
-                        CASE 
-                            WHEN COUNT(*) > 0 THEN (CASE qt.seq
-                                WHEN 0 THEN AVG(q0)
-                                WHEN 1 THEN AVG(q1)
-                                WHEN 2 THEN AVG(q2)
-                                WHEN 3 THEN AVG(q3)
-                                WHEN 4 THEN AVG(q4)
-                                WHEN 5 THEN AVG(q5)
-                                WHEN 6 THEN AVG(q6)
-                                WHEN 7 THEN AVG(q7)
-                                WHEN 8 THEN AVG(q8)
-                                WHEN 9 THEN AVG(q9)
-                                WHEN 10 THEN AVG(q10)
-                                WHEN 11 THEN AVG(q11)
-                                WHEN 12 THEN AVG(q12)
-                                WHEN 13 THEN AVG(q13)
-                                WHEN 14 THEN AVG(q14)
-                                WHEN 15 THEN AVG(q15)
-                                WHEN 16 THEN AVG(q16)
-                            END) * 20
-                            ELSE 0 
-                        END,
-                    3) AS adjusted_total
-                    FROM cf${term}
-                    CROSS JOIN QuestionText qt
-                    WHERE branch = ? AND batch = ? AND sem = ?
-                    GROUP BY qt.qtext, qt.seq, branch, sem
-                    ORDER BY branch, qt.seq;
-
-            `);
-            const cfreportquestions: any = await dbQuery(query, [branch, batch, sem]);
-        return res.json({ cfreportquestions: cfreportquestions });
-    } catch (error) {
-        console.error('Error executing query:', error);
-        res.status(500).send('Error executing query');
-    }
-}
-
+// Questions Parameters
 export async function ReportQuestions(req: Request, res: Response) {
     try {
         const { term, sem, sec, facID, subcode, batch, fbranch } = req.body;
@@ -514,10 +377,141 @@ export async function ReportQuestions(req: Request, res: Response) {
     }
 }
 
+export async function CFReportQuestions(req: Request, res: Response) {
+    try {
+        const { fbranch, term, sem, startYear, endYear, batch } = req.body;
+        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+
+        const query = req.body.usernameInToken !== 'admin' ?
+            `WITH QuestionText AS (
+            SELECT question AS qtext, seq
+            FROM questions
+            WHERE qtype = 'ctype'
+        )
+        SELECT 
+            qt.qtext AS question,
+            branch, sem, COUNT(*) AS count,
+            CASE qt.seq
+                WHEN 0 THEN AVG(q0)
+                WHEN 1 THEN AVG(q1)
+                WHEN 2 THEN AVG(q2)
+                WHEN 3 THEN AVG(q3)
+                WHEN 4 THEN AVG(q4)
+                WHEN 5 THEN AVG(q5)
+                WHEN 6 THEN AVG(q6)
+                WHEN 7 THEN AVG(q7)
+                WHEN 8 THEN AVG(q8)
+                WHEN 9 THEN AVG(q9)
+                WHEN 10 THEN AVG(q10)
+                WHEN 11 THEN AVG(q11)
+                WHEN 12 THEN AVG(q12)
+                WHEN 13 THEN AVG(q13)
+                WHEN 14 THEN AVG(q14)
+                WHEN 15 THEN AVG(q15)
+                WHEN 16 THEN AVG(q16)
+            END AS total,
+            ROUND(
+                CASE 
+                    WHEN COUNT(*) > 0 THEN 
+                        (CASE qt.seq
+                            WHEN 0 THEN AVG(q0)
+                            WHEN 1 THEN AVG(q1)
+                            WHEN 2 THEN AVG(q2)
+                            WHEN 3 THEN AVG(q3)
+                            WHEN 4 THEN AVG(q4)
+                            WHEN 5 THEN AVG(q5)
+                            WHEN 6 THEN AVG(q6)
+                            WHEN 7 THEN AVG(q7)
+                            WHEN 8 THEN AVG(q8)
+                            WHEN 9 THEN AVG(q9)
+                            WHEN 10 THEN AVG(q10)
+                            WHEN 11 THEN AVG(q11)
+                            WHEN 12 THEN AVG(q12)
+                            WHEN 13 THEN AVG(q13)
+                            WHEN 14 THEN AVG(q14)
+                            WHEN 15 THEN AVG(q15)
+                            WHEN 16 THEN AVG(q16)
+                        END) * 20
+                    ELSE 0 
+                END,
+            3) AS adjusted_total
+        FROM cf${term}
+        CROSS JOIN QuestionText qt
+        WHERE branch = ? 
+            AND sem = ? 
+            AND batch = ?
+        GROUP BY qt.qtext, qt.seq, branch, sem, batch
+        ORDER BY branch, qt.seq;
+        ` :
+            `SELECT 
+            q.seq AS QuestionSequence,
+            q.question AS question,
+            ROUND(
+                AVG(
+                    CASE q.seq
+                        WHEN 0 THEN cf.q0
+                        WHEN 1 THEN cf.q1
+                        WHEN 2 THEN cf.q2
+                        WHEN 3 THEN cf.q3
+                        WHEN 4 THEN cf.q4
+                        WHEN 5 THEN cf.q5
+                        WHEN 6 THEN cf.q6
+                        WHEN 7 THEN cf.q7
+                        WHEN 8 THEN cf.q8
+                        WHEN 9 THEN cf.q9
+                        WHEN 10 THEN cf.q10
+                        WHEN 11 THEN cf.q11
+                        WHEN 12 THEN cf.q12
+                        WHEN 13 THEN cf.q13
+                        WHEN 14 THEN cf.q14
+                        WHEN 15 THEN cf.q15
+                        WHEN 16 THEN cf.q16
+                    END
+                ) * 100 / 5, 2
+            ) AS adjusted_total,
+            COUNT(
+                CASE q.seq
+                    WHEN 0 THEN cf.q0
+                    WHEN 1 THEN cf.q1
+                    WHEN 2 THEN cf.q2
+                    WHEN 3 THEN cf.q3
+                    WHEN 4 THEN cf.q4
+                    WHEN 5 THEN cf.q5
+                    WHEN 6 THEN cf.q6
+                    WHEN 7 THEN cf.q7
+                    WHEN 8 THEN cf.q8
+                    WHEN 9 THEN cf.q9
+                    WHEN 10 THEN cf.q10
+                    WHEN 11 THEN cf.q11
+                    WHEN 12 THEN cf.q12
+                    WHEN 13 THEN cf.q13
+                    WHEN 14 THEN cf.q14
+                    WHEN 15 THEN cf.q15
+                    WHEN 16 THEN cf.q16
+                END
+            ) AS StudentCount
+        FROM cf${term} AS cf
+        JOIN questions AS q
+        ON q.qtype = 'ctype'
+        WHERE cf.batch BETWEEN ? AND ? 
+        AND cf.sem IN (?)
+        GROUP BY q.seq, q.question
+        ORDER BY q.seq;`;
+
+        const cfreportquestions: any = await dbQuery(query, req.body.usernameInToken !== 'admin' ? [branch, sem, batch] : [startYear, endYear, sem]);
+        return res.json({ cfreportquestions: cfreportquestions });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        res.status(500).send('Error executing query');
+    }
+}
+
+
+//  Average Generation
 export async function ReportAverage(req: Request, res: Response) {
     try {
         const { fbranch } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const branch = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
         const report1Check: any = await dbQuery(`
             SELECT COUNT(*) AS count 
             FROM report1;
@@ -542,10 +536,62 @@ export async function ReportAverage(req: Request, res: Response) {
     }
 }
 
+export async function fetchReportAverage(req: Request, res: Response) {
+    try {
+        const { batch, sec, sem, fbranch } = req.body;
+        const branch = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
+
+        const query: string = (`
+            SELECT 
+                r1.facID,
+                f.facName,
+                r1.subcode,
+                s.subname,
+                r1.sem,
+                r1.sec,
+                r1.batch,
+                r1.branch,
+                r1.percentile AS percentile1,
+                r2.percentile AS percentile2,
+                ROUND((AVG(COALESCE(r1.percentile, 0)) + AVG(COALESCE(r2.percentile, 0))) / 2, 4) AS percentile
+            FROM 
+                report1 r1
+            JOIN 
+                report2 r2
+                ON r1.facID = r2.facID
+                AND r1.subcode = r2.subcode
+                AND r1.sec = r2.sec
+                AND r1.sem = r2.sem
+                AND r1.batch = r2.batch
+                AND r1.branch = r2.branch
+            JOIN 
+                faculty f
+                ON f.facID = r1.facID
+            JOIN 
+                subjects s
+                ON s.subcode = r1.subcode            
+            WHERE 
+                r1.branch = ?
+                AND r1.sem = ?
+                AND r1.sec = ? 
+                AND r1.batch = ?
+            GROUP BY 
+                r1.sem, r1.sec, r1.batch, r1.branch, r1.facID, r1.subcode
+            ORDER BY
+                r1.subcode;
+        `);
+        const report: any = await dbQuery(query, [branch, sem, sec, batch]);
+        return res.json({ report: report });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        res.status(500).send('Error executing query');
+    }
+}
+
 export async function ReportAverageQuestions(req: Request, res: Response) {
     try {
         const { sem, sec, facID, subcode, batch, fbranch } = req.body;
-        const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+        const branch = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
         const subjectType: any = await dbQuery(`SELECT qtype FROM subjects WHERE subcode = '${subcode}';`);
         const { qtype } = subjectType[0];
         let query: any;
@@ -771,6 +817,68 @@ export async function ReportAverageQuestions(req: Request, res: Response) {
         const reportquestions: any = await dbQuery(query, [branch, sem, sec, facID, subcode, batch, branch, sem, sec, facID, subcode, batch]);
 
         return res.json({ reportquestions: reportquestions });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        res.status(500).send('Error executing query');
+    }
+}
+
+export async function CFReportAverage(req: Request, res: Response) {
+    try {
+        const { sem, startYear, endYear } = req.body;
+        const cfReport1Check: any = await dbQuery(`
+            SELECT COUNT(*) AS count 
+            FROM cfreport1;
+        `);
+
+        const cfReport2Check: any = await dbQuery(`
+            SELECT COUNT(*) AS count 
+            FROM cfreport2;
+        `);
+
+        if (cfReport1Check[0].count === 0 || cfReport2Check[0].count === 0) {
+            return res.json({ done: false });
+        }
+        const query: string = (`
+            SELECT cfr1.branch, 
+                CASE 
+                    WHEN cfr1.sem IN (1, 3, 5, 7) THEN 'Odd'
+                    ELSE 'Even'
+                END AS sem_type,
+                ROUND(AVG(cfr1.percentile), 2) AS percentile1, 
+                ROUND(AVG(cfr2.percentile), 2) AS percentile2,
+                ROUND((AVG(cfr1.percentile) + AVG(cfr2.percentile)) / 2, 2) AS avg_percentile
+                FROM cfreport1 cfr1
+                JOIN cfreport2 cfr2 
+                    ON cfr1.branch = cfr2.branch 
+                    AND cfr1.sem = cfr2.sem 
+                WHERE cfr1.batch BETWEEN ? AND ? 
+                    AND cfr1.sem IN (?) 
+                    AND cfr2.batch BETWEEN ? AND ? 
+                    AND cfr2.sem IN (?)
+                GROUP BY cfr1.branch, sem_type
+
+                UNION ALL
+
+                SELECT 'Overall' AS branch, 
+                                CASE 
+                                    WHEN cfr1.sem IN (1, 3, 5, 7) THEN 'Odd'
+                                    ELSE 'Even'
+                                END AS sem_type,
+                                ROUND(AVG(cfr1.percentile), 2) AS percentile1,
+                                ROUND(AVG(cfr2.percentile), 2) AS percentile2,
+                                ROUND((AVG(cfr1.percentile) + AVG(cfr2.percentile)) / 2, 2) AS avg_percentile
+                FROM cfreport1 cfr1
+                JOIN cfreport2 cfr2 
+                    ON cfr1.sem = cfr2.sem 
+                WHERE cfr1.batch BETWEEN ? AND ? 
+                    AND cfr1.sem IN (?) 
+                    AND cfr2.batch BETWEEN ? AND ? 
+                    AND cfr2.sem IN (?)
+                GROUP BY sem_type;
+        `);
+        const cfReportavg: any = await dbQuery(query, [startYear, endYear, sem, startYear, endYear, sem, startYear, endYear, sem, startYear, endYear, sem]);
+        return res.json({ done: true, details: cfReportavg });
     } catch (error) {
         console.error('Error executing query:', error);
         res.status(500).send('Error executing query');

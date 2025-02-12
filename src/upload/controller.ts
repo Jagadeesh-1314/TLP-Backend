@@ -26,7 +26,7 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
           .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-          .concat( `${parseInt(batch)}`, "'undone'", "'undone'", `md5('${row.split(",")[0]}')`, '123123', `'${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}'`)
+          .concat( `${parseInt(batch)}`, "'undone'", "'undone'", `md5('${row.split(",")[0]}')`)
       )
       .map((row) => `(${row.join(",")})`);
   } else {
@@ -39,7 +39,7 @@ function processCSVStudents(data: string, username: string, branch: string, batc
           .split(",")
           .filter((cell) => cell !== null && cell !== "")
           .map((cell) => (cell ? `'${cell.trim()}'` : "NULL"))
-          .concat(`'${branch}'`, `${parseInt(batch)}`, "'undone'", "'undone'", `md5('${row.split(",")[0]}')`, '123123', `'${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}'`)
+          .concat(`'${branch}'`, `${parseInt(batch)}`, "'undone'", "'undone'", `md5('${row.split(",")[0]}')`)
       )
       .map((row) => `(${row.join(",")})`);
   }

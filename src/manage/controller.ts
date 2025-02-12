@@ -14,8 +14,6 @@ type tableNames =
   | "electives"
   | "questions";
 
-// Below are the common functionalites for managing studentInfo, Print and Paid entries
-
 // ANCHOR Getting Student Details 
 
 export async function getTable(req: Request, res: Response) {
@@ -62,7 +60,12 @@ export async function getTable(req: Request, res: Response) {
 
       if (tableName !== 'faculty' && tableName !== 'subjects') {
         const semCondition =
-          req.body.branchInToken === 'FME' || req.body.branchInToken === 'MBA' ? 'sem IN (1, 2)' : 'sem NOT IN (1, 2)';
+          req.body.branchInToken === 'FME'
+            ? 'sem IN (1, 2)'
+            : req.body.branchInToken === 'MBA' || req.body.usernameInToken === 'admin'
+              ? '1=1' // This will return all semesters
+              : 'sem NOT IN (1, 2)';
+
         return `
           SELECT * FROM ${tableName}
           WHERE branch = '${branch}' AND ${semCondition}
@@ -85,11 +88,10 @@ export async function getTable(req: Request, res: Response) {
 }
 
 
-
 export async function branchDetails(req: Request, res: Response) {
   try {
     const result: any = await dbQuery(`
-      SELECT DISTINCT branch FROM studentinfo WHERE sem in (1, 2) ORDER BY branch;
+      SELECT DISTINCT branch FROM studentinfo ORDER BY branch;
     `);
     const branchDetails = result.map((row: { branch: string }) => row.branch);
 
@@ -105,9 +107,7 @@ export async function branchDetails(req: Request, res: Response) {
 
 export async function editDetails(req: Request, res: Response) {
   try {
-    const count = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const data: any = count;
-    const term = data.length > 0 ? data[0].count : null;
+
     const validTableNames: tableNames[] = [
       "faculty",
       "studentinfo",
@@ -127,9 +127,11 @@ export async function editDetails(req: Request, res: Response) {
         return value === undefined;
       });
     };
+
     if (!details || isAnyInvalid(details)) {
       return res.status(400).json(responses.NotAllParamsGiven);
     }
+
     if (!validTableNames.includes(tableName as tableNames)) {
       return res.status(400).json({ message: "Invalid table name" });
     }
@@ -161,13 +163,15 @@ export async function editDetails(req: Request, res: Response) {
           AND sem = ?
           AND sec = ?
           AND branch = ?;
+          AND batch = ?;
       `;
       const values = [
         details.facID,
         details.subCode,
         details.sem,
         details.sec,
-        details.branch
+        details.branch,
+        details.batch
       ];
       const result: any = await dbQuery(query, values);
       if (result.protocol41) {
@@ -284,9 +288,13 @@ export async function addDetails(req: Request, res: Response) {
 
   const { details, tableName } = req.body;
   console.log(details, tableName);
-  const { sem, sec, branch } = details;
-  const data = await dbQuery(`SELECT * FROM COUNTTERM;`);
-  const term = data.length > 0 ? data[0].count : null;
+  const { sem, sec, branch, batch } = details;
+
+  const termQuery = `SELECT term FROM term WHERE branch = ?`;
+  const termResult = await dbQuery(termQuery, [req.body.branchInToken]);
+
+  const term = termResult.length > 0 ? termResult[0].term : null;
+
   const ip = req.ip as string;
 
   const isAnyInvalid = (obj: { [key: string]: unknown }): boolean => {
@@ -298,25 +306,13 @@ export async function addDetails(req: Request, res: Response) {
     });
   };
 
+  if (!validTableNames.includes(tableName as tableNames)) {
+    return res.status(400).json({ message: "Invalid table name" });
+  }
+
   if (!details || isAnyInvalid(details)) {
     return res.status(400).json(responses.NotAllParamsGiven);
   }
-
-  // if (!validTableNames.includes(tableName as tableNames)) {
-  //   return res.status(400).json({ message: "Invalid table name" });
-  // }
-
-  // const currentYear = new Date().getFullYear();
-
-  // if (details.batch !== undefined && typeof details.batch === 'string') {
-  //   const parsedBatch = parseInt(details.batch, 10);
-
-  //   if (parsedBatch >= currentYear - 3 && parsedBatch <= currentYear) {
-  //     details.batch = parsedBatch;
-  //   } else {
-  //     return res.status(400).json({ message: "Batch year must be between " + (currentYear - 3) + " and " + currentYear + "." });
-  //   }
-  // }
 
   if (details.sem !== undefined && typeof details.sem === 'string') {
     const parsedSem = parseInt(details.sem, 10);
@@ -327,105 +323,108 @@ export async function addDetails(req: Request, res: Response) {
     }
   }
 
+  console.log(term);
   try {
-    // Fetching the Subject Name for the Subject Code
-    // let subName: any = await dbQuery(
-    //   `SELECT subName FROM codeNames WHERE subCode = '${subCode}'`
-    // );
-    // // Checking whether the given Subject Code do exists
-    // if (subName.length === 0)
-    //   return res.json({ error: { message: "Invalid Subject Code" } });
-    // subName = subName[0].subName as string;
-
-    // const query: string = `INSERT IGNORE INTO studentInfo (rollNo, subCode, subName, grade, acYear, sem, exYear, exMonth) VALUES ("${rollNo}", "${subCode}", "${subName}", "${details.grade}", ${acYear}, ${sem}, "${details.exYear}", "${details.exMonth}")`;
-    // await dbQuery(query);
-    // logger.log(`info`, `${req.body.usernameInToken} has added ${rollNo} details in studentInfo on IP ${ip?.slice(7)}`);
-    // return res.json({ done: true });
+    await dbQuery('BEGIN'); // Start transaction
 
     if (tableName === "timetable") {
       const query: string = `
-          INSERT INTO timetable (facID, subCode, sem, sec, branch ) VALUES (?, ?, ?, ?, ?);
+          INSERT INTO timetable (facID, subCode, sem, sec, branch, batch ) VALUES (?, ?, ?, ?, ?, ?);
 
-          UPDATE studentinfo set token${term} = 'undone' WHERE sem = ${sem} AND sec = '${sec}' AND branch = '${branch}';
+          UPDATE studentinfo set token${term} = 'undone' WHERE sem = ${sem} AND sec = '${sec}' AND branch = '${branch}' AND batch = ${batch};
 
-          DELETE FROM theoryscore2 
+          DELETE FROM theoryscore${term}
           WHERE rollno IN (
               SELECT rollno FROM (
                   SELECT DISTINCT s.rollno
                   FROM studentinfo s
-                  LEFT JOIN theoryscore2 t ON s.rollno = t.rollno
-                  LEFT JOIN labscore2 l ON s.rollno = l.rollno
+                  LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
+                  LEFT JOIN labscore${term} l ON s.rollno = l.rollno
                   WHERE s.token${term} = 'undone'
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL)
               ) AS temp
           );
 
-          DELETE FROM labscore2
+          DELETE FROM labscore${term}
           WHERE rollno IN (
               SELECT rollno FROM (
                   SELECT DISTINCT s.rollno
                   FROM studentinfo s
-                  LEFT JOIN theoryscore2 t ON s.rollno = t.rollno
-                  LEFT JOIN labscore2 l ON s.rollno = l.rollno
+                  LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
+                  LEFT JOIN labscore${term} l ON s.rollno = l.rollno
                   WHERE s.token${term} = 'undone'
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL)
               ) AS temp
           );
 
-          DELETE FROM cf2 
+          DELETE FROM cf${term}
           WHERE rollno IN (
               SELECT rollno FROM (
                   SELECT DISTINCT s.rollno
                   FROM studentinfo s
-                  LEFT JOIN theoryscore2 t ON s.rollno = t.rollno
-                  LEFT JOIN labscore2 l ON s.rollno = l.rollno
-                  LEFT JOIN cf2 c ON s.rollno = c.rollno
+                  LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
+                  LEFT JOIN labscore${term} l ON s.rollno = l.rollno
+                  LEFT JOIN cf${term} c ON s.rollno = c.rollno
                   WHERE s.token${term} = 'undone'
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL OR c.rollno IS NOT NULL)
               ) AS temp
           );   
+
+          DELETE FROM report${term} WHERE sem = ${sem} AND branch = '${branch}' AND batch = ${batch};
       `;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
+      console.log(query);
       console.log(result[0])
       if (result[0].protocol41) {
+        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
+      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" });
 
     } else if (tableName === "studentinfo") {
       const query: string = `INSERT INTO studentinfo (rollno, Name, sec, sem, branch, batch, token, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[]), "undone", md5(details.rollno)]);
       if (result.protocol41) {
+        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
+      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "subjects") {
       const query: string = `INSERT INTO subjects (subCode, subName, qtype, def ) VALUES (?, ?, ?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
+        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
+      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "faculty") {
       const query: string = `INSERT INTO faculty ( facID, facName ) VALUES (?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
+        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
+      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "electives") {
       const query: string = `INSERT INTO electives ( rollno, facID, subCode) VALUES (?, ?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
+        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
+      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
     }
 
   } catch (err) {
+    await dbQuery('ROLLBACK'); // Rollback transaction in case of error
     logger.log("error", err);
     return res.json(responses.ErrorWhileDBRequest);
   }
@@ -593,27 +592,6 @@ export async function updateUser(req: Request, res: Response) {
       } WHERE username='${oldUsername}';`
     );
     res.json({ done: true });
-  } catch (err) {
-    logger.log("error", err);
-    return res.json(responses.ErrorWhileDBRequest);
-  }
-}
-
-export async function getSubName(
-  { params: { subCode } }: Request,
-  res: Response
-) {
-  if (isAnyUndefined(subCode)) {
-    return res.status(400).json(responses.NotAllParamsGiven);
-  }
-  try {
-    const result = (await dbQuery(
-      `SELECT subName FROM codeNames WHERE subCode = ? `,
-      [subCode]
-    )) as { subName: string }[];
-    if (result.length == 0) return res.json(responses.InvalidParameterValue);
-
-    res.json({ subName: result[0].subName });
   } catch (err) {
     logger.log("error", err);
     return res.json(responses.ErrorWhileDBRequest);
