@@ -10,11 +10,8 @@ CREATE TABLE studentinfo (
     batch INT DEFAULT NULL,
     token1 ENUM('facdone', 'undone', 'done') DEFAULT NULL,
     token2 ENUM('facdone', 'undone', 'done') DEFAULT NULL,
-    password VARCHAR(255) DEFAULT NULL,
-    otp VARCHAR(10) NOT NULL,
-    otp_expiration DATETIME DEFAULT NULL
-);
-
+    password VARCHAR(255) DEFAULT NULL
+    );
 
 CREATE TABLE subjects (
     subCode VARCHAR(25) NOT NULL,
@@ -29,6 +26,7 @@ CREATE TABLE theoryscore1 (
     facID VARCHAR(15) NOT NULL,
     subcode VARCHAR(15) NOT NULL,
     sem INT NOT NULL,
+    batch INT NOT NULL,
     q1 INT DEFAULT NULL,
     q2 INT DEFAULT NULL,
     q3 INT DEFAULT NULL,
@@ -40,16 +38,15 @@ CREATE TABLE theoryscore1 (
     q9 INT DEFAULT NULL,
     q10 INT DEFAULT NULL,
     score FLOAT DEFAULT NULL,
-    batch INT DEFAULT NULL,
-    PRIMARY KEY (rollno, facID, subcode, sem)
+    PRIMARY KEY (rollno, facID, subcode, sem, batch)
 );
-
 
 CREATE TABLE theoryscore2 (
     rollno VARCHAR(12) NOT NULL,
     facID VARCHAR(15) NOT NULL,
     subcode VARCHAR(15) NOT NULL,
     sem INT NOT NULL,
+    batch INT NOT NULL,
     q1 INT DEFAULT NULL,
     q2 INT DEFAULT NULL,
     q3 INT DEFAULT NULL,
@@ -61,20 +58,18 @@ CREATE TABLE theoryscore2 (
     q9 INT DEFAULT NULL,
     q10 INT DEFAULT NULL,
     score FLOAT DEFAULT NULL,
-    batch INT DEFAULT NULL,
-    PRIMARY KEY (rollno, facID, subcode, sem)
+    PRIMARY KEY (rollno, facID, subcode, sem, batch)
 );
-
 
 CREATE TABLE timetable (
     facID VARCHAR(15) NOT NULL,
     subCode VARCHAR(25) NOT NULL,
     sem INT NOT NULL,
     sec VARCHAR(5) NOT NULL,
+    batch INT NOT NULL,
     branch VARCHAR(10) NOT NULL,
-    PRIMARY KEY (facID, subCode, sem, sec, branch)
+    PRIMARY KEY (facID, subCode, sem, sec, branch, batch)
 );
-
 
 CREATE TABLE users (
     userName VARCHAR(255) NOT NULL,
@@ -84,7 +79,6 @@ CREATE TABLE users (
     branch VARCHAR(10) NOT NULL,
     PRIMARY KEY (userName, displayName, branch)
 );
-
 
 CREATE TABLE cf1 (
     rollno VARCHAR(15) NOT NULL,
@@ -154,10 +148,6 @@ CREATE TABLE cfreport2 (
     PRIMARY KEY (branch, batch, sem)
 );
 
-CREATE TABLE countterm (
-    count INT NOT NULL
-);
-
 CREATE TABLE faculty (
     facID VARCHAR(15) NOT NULL,
     facName VARCHAR(255) DEFAULT NULL,
@@ -169,6 +159,7 @@ CREATE TABLE labscore1 (
     facID VARCHAR(15) NOT NULL,
     subcode VARCHAR(15) NOT NULL,
     sem INT NOT NULL,
+    batch INT NOT NULL,
     q1 INT DEFAULT NULL,
     q2 INT DEFAULT NULL,
     q3 INT DEFAULT NULL,
@@ -178,8 +169,7 @@ CREATE TABLE labscore1 (
     q7 INT DEFAULT NULL,
     q8 INT DEFAULT NULL,
     score FLOAT DEFAULT NULL,
-    batch INT DEFAULT NULL,
-    PRIMARY KEY (rollno, facID, subcode, sem)
+    PRIMARY KEY (rollno, facID, subcode, sem, batch)
 );
 
 CREATE TABLE labscore2 (
@@ -187,6 +177,7 @@ CREATE TABLE labscore2 (
     facID VARCHAR(15) NOT NULL,
     subcode VARCHAR(15) NOT NULL,
     sem INT NOT NULL,
+    batch INT NOT NULL,
     q1 INT DEFAULT NULL,
     q2 INT DEFAULT NULL,
     q3 INT DEFAULT NULL,
@@ -196,10 +187,8 @@ CREATE TABLE labscore2 (
     q7 INT DEFAULT NULL,
     q8 INT DEFAULT NULL,
     score FLOAT DEFAULT NULL,
-    batch INT DEFAULT NULL,
-    PRIMARY KEY (rollno, facID, subcode, sem)
+    PRIMARY KEY (rollno, facID, subcode, sem, batch)
 );
-
 
 CREATE TABLE questions (
     qtype VARCHAR(10) NOT NULL,
@@ -236,7 +225,6 @@ CREATE TABLE report2 (
   PRIMARY KEY (facID, subcode, sec, sem, batch, branch)
 );
 
-
 CREATE TABLE electives (
     rollno  VARCHAR(15) NOT NULL,
     facID   VARCHAR(15) NOT NULL,
@@ -244,10 +232,29 @@ CREATE TABLE electives (
     PRIMARY KEY (rollno, subcode)
 );
 
+CREATE TABLE otp_verification (
+    rollno VARCHAR(255) NOT NULL,
+    otp INT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (rollno) REFERENCES studentinfo(rollno)
+);
+
+CREATE TABLE term (
+    branch VARCHAR(15) NOT NULL PRIMARY KEY,
+    term ENUM('1', '2') NOT NULL,
+    status ENUM('active', 'inactive') NOT NULL
+);
+
 
 INSERT INTO users VALUES ("admin", "89110ab33e4f960f498d1ebe8318d459", "AD", "admin", '');
 
-INSERT INTO countterm VALUES (1);
+
+INSERT INTO term (branch, term, status)
+SELECT DISTINCT branch, '1', 'inactive' FROM users
+WHERE userName != 'admin';
+
 
 INSERT INTO questions (qtype, question, seq)
 VALUES

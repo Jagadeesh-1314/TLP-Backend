@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { serverLogFilePath, infoLogFilePath, logInConsole, logInFile } from '../../config-local';
+import { serverLogFilePath, infoLogFilePath, logInConsole } from '../../config-local';
 import dayjs from "dayjs";
 
 

@@ -60,8 +60,6 @@ function convertToXLSX(
   }
 }
 
-
-
 async function convertToDOCX(
   result: any,
   fields: FieldInfo[],
@@ -429,8 +427,11 @@ export async function unfilledstudents(req: Request, res: Response) {
   const { sem, sec, fbranch } = req.query;
   const branchControl = req.body.branchInToken !== 'FME' ? req.body.branchInToken : fbranch;
   try {
-    const data = await dbQuery(`SELECT * FROM COUNTTERM;`);
-    const term = data.length > 0 ? data[0].count : null;
+    const countQuery = `SELECT * FROM term where branch = ?`;
+    const count = await dbQuery(countQuery, [req.body.branchInToken]);
+
+    const data: any = count;
+    const term = data.length > 0 ? data[0].term : null;
     let i: number = Math.floor(Number(sem) / 2);
     let j: number = (Math.floor(Number(sem) % 2) != 0) ? 1 : 2;
     const secCondition = sec ? `AND sec = '${sec}'` : "";
@@ -569,47 +570,47 @@ async function generateChart(reportData: any[], term: any) {
   const chartJSNodeCanvas = new ChartJSNodeCanvas({ width: 800, height: 400 });
   // Prepare labels and data for the chart
   const labels = reportData.map((item: any) => item.subname);
-  
+
   // Handle single or multiple percentiles based on `term`
   const dataset =
     term === '0'
       ? [
-          {
-            label: 'Report 1',
-            data: reportData.map((item: any) => item.percentile1),
-            backgroundColor: reportData.map((item: any) =>
-              item.percentile1 > 70 ? 'rgba(2, 97, 250, 0.2)' : 'rgba(255, 99, 132, 0.2)'
-            ),
-            borderColor: reportData.map((item: any) =>
-              item.percentile1 > 70 ? 'rgba(2, 97, 250, 1)' : 'rgba(255, 99, 132, 1)'
-            ),
-            borderWidth: 1,
-          },
-          {
-            label: 'Report 2',
-            data: reportData.map((item: any) => item.percentile2),
-            backgroundColor: reportData.map((item: any) =>
-              item.percentile2 > 70 ? 'rgba(50, 205, 50, 0.2)' : 'rgba(255, 165, 0, 0.2)'
-            ),
-            borderColor: reportData.map((item: any) =>
-              item.percentile2 > 70 ? 'rgba(50, 205, 50, 1)' : 'rgba(255, 165, 0, 1)'
-            ),
-            borderWidth: 1,
-          },
-        ]
+        {
+          label: 'Report 1',
+          data: reportData.map((item: any) => item.percentile1),
+          backgroundColor: reportData.map((item: any) =>
+            item.percentile1 > 70 ? 'rgba(2, 97, 250, 0.2)' : 'rgba(255, 99, 132, 0.2)'
+          ),
+          borderColor: reportData.map((item: any) =>
+            item.percentile1 > 70 ? 'rgba(2, 97, 250, 1)' : 'rgba(255, 99, 132, 1)'
+          ),
+          borderWidth: 1,
+        },
+        {
+          label: 'Report 2',
+          data: reportData.map((item: any) => item.percentile2),
+          backgroundColor: reportData.map((item: any) =>
+            item.percentile2 > 70 ? 'rgba(50, 205, 50, 0.2)' : 'rgba(255, 165, 0, 0.2)'
+          ),
+          borderColor: reportData.map((item: any) =>
+            item.percentile2 > 70 ? 'rgba(50, 205, 50, 1)' : 'rgba(255, 165, 0, 1)'
+          ),
+          borderWidth: 1,
+        },
+      ]
       : [
-          {
-            label: 'Percentile',
-            data: reportData.map((item: any) => item.percentile),
-            backgroundColor: reportData.map((item: any) =>
-              item.percentile > 70 ? 'rgba(2, 97, 250, 0.2)' : 'rgba(255, 99, 132, 0.2)'
-            ),
-            borderColor: reportData.map((item: any) =>
-              item.percentile > 70 ? 'rgba(2, 97, 250, 1)' : 'rgba(255, 99, 132, 1)'
-            ),
-            borderWidth: 1,
-          },
-        ];
+        {
+          label: 'Percentile',
+          data: reportData.map((item: any) => item.percentile),
+          backgroundColor: reportData.map((item: any) =>
+            item.percentile > 70 ? 'rgba(2, 97, 250, 0.2)' : 'rgba(255, 99, 132, 0.2)'
+          ),
+          borderColor: reportData.map((item: any) =>
+            item.percentile > 70 ? 'rgba(2, 97, 250, 1)' : 'rgba(255, 99, 132, 1)'
+          ),
+          borderWidth: 1,
+        },
+      ];
 
   const chartConfig: ChartConfiguration = {
     type: 'bar',
@@ -647,7 +648,6 @@ async function generateChart(reportData: any[], term: any) {
   const imageBuffer = await chartJSNodeCanvas.renderToBuffer(chartConfig);
   return imageBuffer;
 }
-
 
 
 export async function downloadReport(req: Request, res: Response) {
@@ -1171,6 +1171,8 @@ async function createChartImage(data: any[], outputPath: string) {
         },
         y: {
           type: 'linear',
+          min: 0,
+          max: 100,
           ticks: {
             stepSize: 20,
             callback: (tickValue: string | number) => {
@@ -1202,10 +1204,197 @@ async function createChartImage(data: any[], outputPath: string) {
   fs.writeFileSync(outputPath, rotatedBuffer);
 }
 
-
+// Only For Admin
 export async function downloadCFReport(req: Request, res: Response) {
-  const { sem, batch, term, fbranch } = req.query;
-  const branch = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+  const { term, sem, startYear, endYear } = req.query;
+
+  if (!sem || !term) {
+    return res.status(400).send("Semester, Batch, and Count are required.");
+  }
+
+  try {
+    const query: string = `
+      SELECT branch, 
+            CASE 
+                WHEN sem IN (1, 3, 5, 7) THEN 'Odd'
+                ELSE 'Even'
+            END AS sem_type,
+            AVG(percentile) AS percentile 
+      FROM cfreport${term} 
+      WHERE batch BETWEEN ? AND ? AND sem IN (?) 
+      GROUP BY branch, sem_type
+      UNION ALL
+      SELECT 'Overall' AS branch, 
+            CASE 
+                WHEN sem IN (1, 3, 5, 7) THEN 'Odd'
+                ELSE 'Even'
+            END AS sem_type,
+            AVG(percentile) AS percentile 
+      FROM cfreport${term} 
+      WHERE batch BETWEEN ? AND ? AND sem IN (?)
+      GROUP BY sem_type;
+    `;
+
+    const result: any = await dbQuery(query, [startYear, endYear, sem, startYear, endYear, sem]);
+
+    const overallData = result.find((item: { branch: string; }) => item.branch === 'Overall');
+    const branchData = result.filter((item: { branch: string; }) => item.branch !== 'Overall');
+
+    const tableRows = [
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "S.No", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Branch", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+          // new TableCell({
+          //   children: [new Paragraph({ children: [new TextRun({ text: "Sem Type", bold: true, size: 32 })] })],
+          //   margins: { top: 100, bottom: 100, left: 100, right: 100 },
+          //   shading: { fill: "ADD8E6" },
+          // }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Percentage", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+        ],
+      }),
+      ...branchData.map(
+        (item: { branch: any; sem_type: any; percentile: number }, index: number) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: (index + 1).toString(), size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: item.branch, size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+              // new TableCell({
+              //   children: [new Paragraph({ children: [new TextRun({ text: item.sem_type, size: 28 })] })],
+              //   margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              // }),
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: item.percentile.toFixed(2), size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+            ],
+          })
+      ),
+    ];
+
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Geethanjali College of Engineering and Technology",
+                  font: "Old English Text MT",
+                  size: 42,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              text: `CF Report - "All Branches" (Batch ${startYear}-${endYear}, Term ${term}, Sem ${sem})`,
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 500 },
+            }),
+
+            // Overall Percentile Above Table
+            new Paragraph({
+              spacing: { before: 200, after: 500 },
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: `Overall Percentile: ${overallData.percentile.toFixed(2)}%`,
+                  bold: true,
+                  font: "Arial",
+                  size: 40,
+                  color: overallData.percentile >= 70 ? "006400" : "8B0000",
+                }),
+              ],
+            }),
+
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: tableRows,
+            }),
+          ],
+        },
+      ],
+    });
+
+
+    const docPath = path.join(__dirname, "tmp", `CFReport_${sem}.docx`);
+
+    // Debugging: Check if document buffer is generated correctly
+    const docBuffer = await Packer.toBuffer(doc);
+
+    // Check if the buffer length is valid (should be greater than 0)
+    if (docBuffer.length > 0) {
+      fs.writeFileSync(docPath, docBuffer);
+
+      res.download(docPath, (err) => {
+        if (err) {
+          console.error("Error downloading file:", err);
+          res.status(500).send("Error generating report.");
+        } else {
+          fs.unlinkSync(docPath);
+        }
+      });
+    } else {
+      console.error("Document buffer is empty.");
+      res.status(500).send("Error generating report.");
+    }
+  } catch (error) {
+    console.error("Error generating report:", error);
+    res.status(500).send("Error generating report.");
+  }
+}
+
+
+export async function downloadCFReportQuestion(req: Request, res: Response) {
+  const { fbranch, term, sem, startYear, endYear, batch } = req.query;
+  const branch = req.body.branchInToken !== 'FME' ? req.body.branchInToken : fbranch;
 
   const branchName: Record<string, string> = {
     CSE: "Computer Science and Engineering",
@@ -1221,137 +1410,140 @@ export async function downloadCFReport(req: Request, res: Response) {
 
   const fullBranchName = branchName[branch];
 
-  if (!sem || !batch || !term) {
-    return res.status(400).send("Semester, Batch, and Count are required.");
+  if (!sem || !term) {
+    return res.status(400).send("Semester, Batch, and Term are required.");
   }
 
   try {
-    const query = `
-                  WITH QuestionText AS (
-                    SELECT 
-                        'Employability Skills' AS qtext, 0 AS seq
-                    UNION ALL
-                    SELECT 
-                        'Mentoring support', 1
-                    UNION ALL
-                    SELECT 
-                        'Campus Placement Efforts', 2
-                    UNION ALL
-                    SELECT 
-                        'Career and academic guidance', 3
-                    UNION ALL
-                    SELECT 
-                        'Leadership of the college', 4
-                    UNION ALL
-                    SELECT 
-                        'Soft skills and Personality Development', 5
-                    UNION ALL
-                    SELECT 
-                        'Library Facilities', 6
-                    UNION ALL
-                    SELECT 
-                        'Extracurricular activities', 7
-                    UNION ALL
-                    SELECT 
-                        'Co-curricular activities', 8
-                    UNION ALL
-                    SELECT 
-                        'College transport facilities', 9
-                    UNION ALL
-                    SELECT 
-                        'Service in Academic Section', 10
-                    UNION ALL
-                    SELECT 
-                        'Service in Exam Branch', 11
-                    UNION ALL
-                    SELECT 
-                        'Service in Accounts Section', 12
-                    UNION ALL
-                    SELECT 
-                        'Physical Education Facilities', 13
-                    UNION ALL
-                    SELECT 
-                        'Quality of food in Canteen', 14
-                    UNION ALL
-                    SELECT 
-                        'Service in the Canteen', 15
-                    UNION ALL
-                    SELECT 
-                        'Overall opinion of GCET', 16
-                )
-                SELECT 
-                    qt.qtext AS question, 
-                    branch, 
-                    sem, 
-                    COUNT(*) AS count,
-                    CASE qt.seq
-                        WHEN 0 THEN AVG(q0)
-                        WHEN 1 THEN AVG(q1)
-                        WHEN 2 THEN AVG(q2)
-                        WHEN 3 THEN AVG(q3)
-                        WHEN 4 THEN AVG(q4)
-                        WHEN 5 THEN AVG(q5)
-                        WHEN 6 THEN AVG(q6)
-                        WHEN 7 THEN AVG(q7)
-                        WHEN 8 THEN AVG(q8)
-                        WHEN 9 THEN AVG(q9)
-                        WHEN 10 THEN AVG(q10)
-                        WHEN 11 THEN AVG(q11)
-                        WHEN 12 THEN AVG(q12)
-                        WHEN 13 THEN AVG(q13)
-                        WHEN 14 THEN AVG(q14)
-                        WHEN 15 THEN AVG(q15)
-                        WHEN 16 THEN AVG(q16)
-                    END AS total,
-                    ROUND(
-                        CASE 
-                            WHEN COUNT(*) > 0 THEN (CASE qt.seq
-                                WHEN 0 THEN AVG(q0)
-                                WHEN 1 THEN AVG(q1)
-                                WHEN 2 THEN AVG(q2)
-                                WHEN 3 THEN AVG(q3)
-                                WHEN 4 THEN AVG(q4)
-                                WHEN 5 THEN AVG(q5)
-                                WHEN 6 THEN AVG(q6)
-                                WHEN 7 THEN AVG(q7)
-                                WHEN 8 THEN AVG(q8)
-                                WHEN 9 THEN AVG(q9)
-                                WHEN 10 THEN AVG(q10)
-                                WHEN 11 THEN AVG(q11)
-                                WHEN 12 THEN AVG(q12)
-                                WHEN 13 THEN AVG(q13)
-                                WHEN 14 THEN AVG(q14)
-                                WHEN 15 THEN AVG(q15)
-                                WHEN 16 THEN AVG(q16)
-                            END) * 20
-                            ELSE 0 
-                        END,
-                    3) AS adjusted_total
-                    FROM cf${term}
-                    CROSS JOIN QuestionText qt
-                    WHERE branch = ? AND sem = ? AND batch = ?
-                    GROUP BY qt.qtext, qt.seq, branch, sem, batch
-                    ORDER BY branch, qt.seq; 
-          `;
+    const query = req.body.usernameInToken !== 'admin' ?
+      `WITH QuestionText AS (
+          SELECT question AS qtext, seq
+          FROM questions
+          WHERE qtype = 'ctype'
+        )
+        SELECT 
+          qt.qtext AS question,
+          branch, sem, COUNT(*) AS count,
+          CASE qt.seq
+              WHEN 0 THEN AVG(q0)
+              WHEN 1 THEN AVG(q1)
+              WHEN 2 THEN AVG(q2)
+              WHEN 3 THEN AVG(q3)
+              WHEN 4 THEN AVG(q4)
+              WHEN 5 THEN AVG(q5)
+              WHEN 6 THEN AVG(q6)
+              WHEN 7 THEN AVG(q7)
+              WHEN 8 THEN AVG(q8)
+              WHEN 9 THEN AVG(q9)
+              WHEN 10 THEN AVG(q10)
+              WHEN 11 THEN AVG(q11)
+              WHEN 12 THEN AVG(q12)
+              WHEN 13 THEN AVG(q13)
+              WHEN 14 THEN AVG(q14)
+              WHEN 15 THEN AVG(q15)
+              WHEN 16 THEN AVG(q16)
+          END AS total,
+          ROUND(
+              CASE 
+                  WHEN COUNT(*) > 0 THEN 
+                      (CASE qt.seq
+                          WHEN 0 THEN AVG(q0)
+                          WHEN 1 THEN AVG(q1)
+                          WHEN 2 THEN AVG(q2)
+                          WHEN 3 THEN AVG(q3)
+                          WHEN 4 THEN AVG(q4)
+                          WHEN 5 THEN AVG(q5)
+                          WHEN 6 THEN AVG(q6)
+                          WHEN 7 THEN AVG(q7)
+                          WHEN 8 THEN AVG(q8)
+                          WHEN 9 THEN AVG(q9)
+                          WHEN 10 THEN AVG(q10)
+                          WHEN 11 THEN AVG(q11)
+                          WHEN 12 THEN AVG(q12)
+                          WHEN 13 THEN AVG(q13)
+                          WHEN 14 THEN AVG(q14)
+                          WHEN 15 THEN AVG(q15)
+                          WHEN 16 THEN AVG(q16)
+                      END) * 20
+                  ELSE 0 
+              END,
+          3) AS adjusted_total
+        FROM cf${term}
+        CROSS JOIN QuestionText qt
+        WHERE branch = ? 
+          AND sem = ? 
+          AND batch = ?
+        GROUP BY qt.qtext, qt.seq, branch, sem, batch
+        ORDER BY branch, qt.seq;
+      ` :
+      `SELECT 
+          q.seq AS QuestionSequence,
+          q.question AS question,
+          ROUND(
+              AVG(
+                  CASE q.seq
+                      WHEN 0 THEN cf.q0
+                      WHEN 1 THEN cf.q1
+                      WHEN 2 THEN cf.q2
+                      WHEN 3 THEN cf.q3
+                      WHEN 4 THEN cf.q4
+                      WHEN 5 THEN cf.q5
+                      WHEN 6 THEN cf.q6
+                      WHEN 7 THEN cf.q7
+                      WHEN 8 THEN cf.q8
+                      WHEN 9 THEN cf.q9
+                      WHEN 10 THEN cf.q10
+                      WHEN 11 THEN cf.q11
+                      WHEN 12 THEN cf.q12
+                      WHEN 13 THEN cf.q13
+                      WHEN 14 THEN cf.q14
+                      WHEN 15 THEN cf.q15
+                      WHEN 16 THEN cf.q16
+                  END
+              ) * 100 / 5, 2
+          ) AS adjusted_total,
+          COUNT(
+              CASE q.seq
+                  WHEN 0 THEN cf.q0
+                  WHEN 1 THEN cf.q1
+                  WHEN 2 THEN cf.q2
+                  WHEN 3 THEN cf.q3
+                  WHEN 4 THEN cf.q4
+                  WHEN 5 THEN cf.q5
+                  WHEN 6 THEN cf.q6
+                  WHEN 7 THEN cf.q7
+                  WHEN 8 THEN cf.q8
+                  WHEN 9 THEN cf.q9
+                  WHEN 10 THEN cf.q10
+                  WHEN 11 THEN cf.q11
+                  WHEN 12 THEN cf.q12
+                  WHEN 13 THEN cf.q13
+                  WHEN 14 THEN cf.q14
+                  WHEN 15 THEN cf.q15
+                  WHEN 16 THEN cf.q16
+              END
+          ) AS StudentCount
+      FROM cf${term} AS cf
+      JOIN questions AS q
+      ON q.qtype = 'ctype'
+      WHERE cf.batch BETWEEN ? AND ? 
+        AND cf.sem IN (?)
+      GROUP BY q.seq, q.question
+      ORDER BY q.seq;`;
 
-    const result: any = await dbQuery(query, [branch, sem, batch]);
-
-
-    const i: number = Math.floor(Number(sem) / 2);
-    const j: string = Number(sem) % 2 !== 0 ? "I" : "II";
+    const result: any = await dbQuery(query,
+      req.body.usernameInToken !== 'admin' ? [branch, sem, batch] : [startYear, endYear, sem]
+    );
 
     let c = Math.floor(Number(sem) / 2);
     if (Number(sem) % 2 === 0) {
       c = c - 1;
     }
 
-    const a: number = Number(batch) + c;
-    const b: number = (a % 100) + 1;
-
-    const report: ReportTableArr = result;
+    const report = result;
 
     // Prepare chart data
-    const chartData = report.map(item => ({
+    const chartData = report.map((item: { question: any; adjusted_total: any; }) => ({
       category: item.question,
       value: item.adjusted_total || 0,
     }));
@@ -1359,279 +1551,153 @@ export async function downloadCFReport(req: Request, res: Response) {
     const chartImagePath = path.join(__dirname, 'tmp', 'cfreport.png');
     await createChartImage(chartData, chartImagePath);
 
-    const sections: ISectionOptions[] = (Array.from(new Set(report.map((item) => item.sec))).map((section) => ({
-      sec: section,
-      reportData: report.filter((item) => item.sec === section),
-    }))
-    ).map((sectionData) => ({
-      properties: {
-        type: SectionType.NEXT_PAGE,
-      },
-      children: [
-        // Document Header
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "Geethanjali College of Engineering and Technology",
-              font: "Old English Text MT",
-              size: 42,
-              bold: true,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 50 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
-              font: "Times New Roman",
-              size: 22,
-              bold: true,
-              italics: true,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 50 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
-              font: "Times New Roman",
-              size: 22,
-              bold: true,
-              italics: true,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Online Feedback report for ${a}-${b} ${j}-Semester Term-${term}`,
-              font: "Times New Roman",
-              size: 30,
-              bold: true,
-              italics: true,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 100 },
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Department of ${fullBranchName} `,
-              font: "Times New Roman",
-              size: 30,
-              bold: true,
-              italics: true,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        }),
+    // Prepare table rows from report data (example)
+    const tableRows = [
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "S.No", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Parameter", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+          // new TableCell({
+          //   children: [new Paragraph({ children: [new TextRun({ text: "Sem Type", bold: true, size: 32 })] })],
+          //   margins: { top: 100, bottom: 100, left: 100, right: 100 },
+          //   shading: { fill: "ADD8E6" },
+          // }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Percentage", bold: true, size: 32 })] })],
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
+            shading: { fill: "ADD8E6" },
+          }),
+        ],
+      }),
+      ...report.map(
+        (item: { question: string; adjusted_total: number; }, index: number) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: (index + 1).toString(), size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: item.question, size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+              // new TableCell({
+              //   children: [new Paragraph({ children: [new TextRun({ text: item.sem_type, size: 28 })] })],
+              //   margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              // }),
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: item.adjusted_total.toFixed(2), size: 28 })] })],
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+              }),
+            ],
+          })
+      ),
+    ];
 
-        // Table with Data
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [
-            // Table Headers
-            new TableRow({
-              children: [
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: "S.No",
-                          bold: true,
-                          size: 25,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 240 },
-                    }),
-                  ],
-                  shading: { fill: "ADD8E6" },
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: "Question",
-                          bold: true,
-                          size: 25,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 240 },
-                    }),
-                  ],
-                  shading: { fill: "ADD8E6" },
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: "Percentage",
-                          bold: true,
-                          size: 25,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 240 },
-                    }),
-                  ],
-                  shading: { fill: "ADD8E6" },
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-              ],
-            }),
-
-            // Data Rows
-            ...report.map((item, index) => new TableRow({
-              children: [
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: (index + 1).toString(),
-                          size: 22,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 100 },
-                    }),
-                  ],
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: item.question,
-                          size: 22,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 100 },
-                    }),
-                  ],
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: item.adjusted_total.toString(),
-                          size: 22,
-                        }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                      spacing: { after: 100 },
-                    }),
-                  ],
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                }),
-
-              ],
-            })),
-
-            // Chart Image
-            new TableRow({
-              children: [
-                new TableCell({
-                  columnSpan: 4,
-                  children: [
-                    new Paragraph({
-                      children: [
-                        new ImageRun({
-                          data: fs.readFileSync(chartImagePath),
-                          transformation: {
-                            width: 600,
-                            height: 400,
-                          },
-                        }),
-                      ],
-                      spacing: { after: 200 },
-                    }),
-                  ],
-                  verticalAlign: VerticalAlign.CENTER,
-                  borders: {
-                    top: { style: BorderStyle.NONE },
-                    bottom: { style: BorderStyle.NONE },
-                    left: { style: BorderStyle.NONE },
-                    right: { style: BorderStyle.NONE },
-                  },
-                }),
-              ],
-            }),
-          ],
-        }),
-      ],
-    }));
 
     // Create Document
     const doc = new Document({
-      sections: sections,
+      sections: [
+        {
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Geethanjali College of Engineering and Technology",
+                  font: "Old English Text MT",
+                  size: 42,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              text: `CF Report - ${fullBranchName || "All Branches"} (Batch ${req.body.usernameInToken === 'admin' || req.body.branchInToken === 'FME' ? `Batch - ${batch}, ` : ''}${startYear}-${endYear}, Term ${term}, Sem ${sem})`,
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 500 },
+            }),
+
+            // Add the table with the data
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: tableRows,
+            }),
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: fs.readFileSync(chartImagePath),
+                  transformation: {
+                    width: 600,
+                    height: 400,
+                  },
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 100 },
+            }),
+          ],
+        },
+      ],
     });
 
-    const fileName = path.join(__dirname, `Report-${batch}-${i}-${j}.docx`);
-    const buffer = await Packer.toBuffer(doc);
-    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
-    fs.writeFileSync(fileName, buffer);
-    res.download(fileName, `CFReport-${branch}-${batch}-${timestamp}.docx`, () => {
-      fs.unlinkSync(fileName);
-    });
+    const docPath = path.join(__dirname, "tmp", `CFReport_${sem}.docx`);
+    const docBuffer = await Packer.toBuffer(doc);
+
+    // Save and send the document
+    if (docBuffer.length > 0) {
+      fs.writeFileSync(docPath, docBuffer);
+
+      res.download(docPath, (err) => {
+        if (err) {
+          console.error("Error downloading file:", err);
+          res.status(500).send("Error generating report.");
+        } else {
+          fs.unlinkSync(docPath);
+        }
+      });
+    } else {
+      console.error("Document buffer is empty.");
+      res.status(500).send("Error generating report.");
+    }
   } catch (error) {
     console.error("Error generating report:", error);
-    res.status(500).send("Failed to generate report.");
+    res.status(500).send("Error generating report.");
   }
 }
 
@@ -2132,7 +2198,7 @@ export async function downloadReportQuestion(req: Request, res: Response) {
 
 export async function downloadAvgReport(req: Request, res: Response) {
   const { sem, sec, batch, term, fbranch } = req.query;
-  const branchControl = (req.body.branchInToken !== 'FME') ? req.body.branchInToken : fbranch;
+  const branchControl = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
 
 
   const branchName: Record<string, string> = {
@@ -2715,6 +2781,502 @@ export async function downloadAvgReport(req: Request, res: Response) {
 
     // Send File to Client
     res.download(filePath, `AVGReport-${batch}-${sem}-${sec ? sec : `ALL_Sections`}-${timestamp}.docx`, (err) => {
+      if (err) {
+        console.error("Error sending file:", err);
+        res.status(500).send("Error generating report.");
+      } else {
+        // Clean up temporary files
+        fs.readdir(path.join(__dirname, 'tmp'), (err, files) => {
+          if (err) throw err;
+          files.forEach(file => {
+            fs.unlink(path.join(__dirname, 'tmp', file), err => {
+              if (err) throw err;
+            });
+          });
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error generating report:", error);
+    res.status(500).send("Error generating report.");
+  }
+}
+
+
+export async function downloadCFAvgReport(req: Request, res: Response) {
+  const { sem, startYear, endYear, fbranch } = req.query;
+  const term = 0;
+  const branchControl = (req.body.branchInToken !== 'FME' && req.body.usernameInToken !== 'admin') ? req.body.branchInToken : fbranch;
+
+  if (!sem || !startYear || !endYear) {
+    return res.status(400).send("Semester, Batch, and Count are required.");
+  }
+
+  try {
+    const query: string = (`
+      SELECT cfr1.branch, 
+          CASE 
+              WHEN cfr1.sem IN (1, 3, 5, 7) THEN 'Odd'
+              ELSE 'Even'
+          END AS sem_type,
+          ROUND(AVG(cfr1.percentile), 2) AS percentile1, 
+          ROUND(AVG(cfr2.percentile), 2) AS percentile2,
+          ROUND((AVG(cfr1.percentile) + AVG(cfr2.percentile)) / 2, 2) AS avg_percentile
+          FROM cfreport1 cfr1
+          JOIN cfreport2 cfr2 
+              ON cfr1.branch = cfr2.branch 
+              AND cfr1.sem = cfr2.sem 
+          WHERE cfr1.batch BETWEEN ? AND ? 
+              AND cfr1.sem IN (?) 
+              AND cfr2.batch BETWEEN ? AND ? 
+              AND cfr2.sem IN (?)
+          GROUP BY cfr1.branch, sem_type
+
+          UNION ALL
+
+          SELECT 'Overall' AS branch, 
+                          CASE 
+                              WHEN cfr1.sem IN (1, 3, 5, 7) THEN 'Odd'
+                              ELSE 'Even'
+                          END AS sem_type,
+                          ROUND(AVG(cfr1.percentile), 2) AS percentile1,
+                          ROUND(AVG(cfr2.percentile), 2) AS percentile2,
+                          ROUND((AVG(cfr1.percentile) + AVG(cfr2.percentile)) / 2, 2) AS avg_percentile
+          FROM cfreport1 cfr1
+          JOIN cfreport2 cfr2 
+              ON cfr1.sem = cfr2.sem 
+          WHERE cfr1.batch BETWEEN ? AND ? 
+              AND cfr1.sem IN (?) 
+              AND cfr2.batch BETWEEN ? AND ? 
+              AND cfr2.sem IN (?)
+          GROUP BY sem_type;
+  `);
+
+    const result: any = await dbQuery(query, [startYear, endYear, sem, startYear, endYear, sem, startYear, endYear, sem, startYear, endYear, sem]);
+
+    const overallData = result.find((item: { branch: string; }) => item.branch === 'Overall');
+    const branchData = result.filter((item: { branch: string; }) => item.branch !== 'Overall');
+
+    const sectionPromises: Promise<(Paragraph | Table)[]>[] = [...new Set(result.map((row: any) => row.sem))].map(async (section) => {
+      const sectionData = branchData.filter((row: any) => row.sem === section);
+
+      return [
+        // Table with Data
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // Table Headers
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "S.No",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Branch",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Term-1",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Term-2",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+                new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "Avg Percentage",
+                          bold: true,
+                          size: 25,
+                        }),
+                      ],
+                      alignment: AlignmentType.CENTER,
+                      spacing: { after: 240 },
+                    }),
+                  ],
+                  shading: { fill: "ADD8E6" },
+                  verticalAlign: VerticalAlign.CENTER,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1 },
+                    bottom: { style: BorderStyle.SINGLE, size: 1 },
+                    left: { style: BorderStyle.SINGLE, size: 1 },
+                    right: { style: BorderStyle.SINGLE, size: 1 },
+                  },
+                  margins: {
+                    top: 50,
+                    bottom: 50,
+                    left: 75,
+                    right: 75,
+                  },
+                }),
+              ],
+            }),
+            // Table Rows
+            ...sectionData.map((item: {
+              branch: any; percentile2: any;
+              percentile1: any; avg_percentile: any; percentile: { toString: () => any; };
+            }, index: number) =>
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: (index + 1).toString() + ".",
+                            size: 24,
+                            bold: true,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    shading: { fill: "ADD8E6" },
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.branch,
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.percentile1.toString(),
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.percentile2.toString(),
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: item.avg_percentile.toString(),
+                            size: 24,
+                          }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 240 },
+                      }),
+                    ],
+                    verticalAlign: VerticalAlign.CENTER,
+                    borders: {
+                      top: { style: BorderStyle.SINGLE, size: 1 },
+                      bottom: { style: BorderStyle.SINGLE, size: 1 },
+                      left: { style: BorderStyle.SINGLE, size: 1 },
+                      right: { style: BorderStyle.SINGLE, size: 1 },
+                    },
+                    margins: {
+                      top: 50,
+                      bottom: 50,
+                      left: 75,
+                      right: 75,
+                    },
+                  }),
+                ],
+              })
+            ),
+          ],
+        }),
+      ];
+    });
+
+    // Resolve the section promises
+    const resolvedSections = await Promise.all(sectionPromises);
+
+    // Create the Document
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            // Report Header
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Geethanjali College of Engineering and Technology",
+                  font: "Old English Text MT",
+                  size: 42,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(Accredited by NAAC with ‘A+’ Grade and NBA, Approved by AICTE, Autonomous Institution)",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 50 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Cheeryal (V), Keesara (M), Medchal Dist-501 301.",
+                  font: "Times New Roman",
+                  size: 22,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Online Feedback report for ${sem}-Semester Term- Average CF Report`,
+                  font: "Times New Roman",
+                  size: 30,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 100 },
+            }),
+            // Add resolved sections to the document
+            new Paragraph({
+              spacing: { before: 200, after: 500 },
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({
+                  text: `Overall Percentile: ${overallData.avg_percentile.toFixed(2)}%`,
+                  bold: true,
+                  font: "Arial",
+                  size: 40,
+                  color: overallData.avg_percentile >= 70 ? "006400" : "8B0000",
+                }),
+              ],
+            }),
+            ...resolvedSections.flat(),
+          ],
+          footers: {
+            default: new Footer({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.RIGHT,
+                  spacing: {
+                    after: 0,
+                  },
+                  children: [
+                    new TextRun({
+                      children: ["Page : ", PageNumber.CURRENT],
+                      size: 22
+                    }),
+                    new TextRun({
+                      children: [" of ", PageNumber.TOTAL_PAGES],
+                      size: 22
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          },
+        },
+      ],
+    });
+
+    // Generate Document and Save to File
+    const timestamp = dayjs().format("DD-MMM-YY_hh-mm_A");
+    const buffer = await Packer.toBuffer(doc);
+    const filePath = path.join(__dirname, 'tmp', `CFReport_Average.docx`);
+    fs.writeFileSync(filePath, buffer);
+
+    // Send File to Client
+    res.download(filePath, `AVGReport-${timestamp}.docx`, (err) => {
       if (err) {
         console.error("Error sending file:", err);
         res.status(500).send("Error generating report.");
