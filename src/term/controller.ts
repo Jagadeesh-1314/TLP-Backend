@@ -94,6 +94,7 @@ export async function promote(req: Request, res: Response) {
       }
 
       await dbQuery(`
+        begin;
         DELETE FROM studentinfo
         WHERE sem = 8 AND branch = '${branch}';
 
@@ -103,11 +104,13 @@ export async function promote(req: Request, res: Response) {
 
         UPDATE studentinfo
         SET token = 'undone' WHERE branch = '${branch}';
+        commit;
       `);
 
       return res.json({ done: true });
     }
   } catch (error) {
+    dbQuery('rollback;');
     console.error('Error executing query:', error);
     res.status(500).send('Error executing query');
   }
@@ -124,15 +127,22 @@ const timeSlots = [
 
 async function getAllRollNumbers(branch: string): Promise<{ rollno: string; name: string }[]> {
   try {
+    const termQuery = `SELECT * FROM term WHERE branch = ?`;
+    const termResult = await dbQuery(termQuery, [branch]);
+    const term = termResult.length > 0 ? termResult[0].term : null;
+
     const semCondition =
-      branch === 'FME' ? `(sem IN (1, 2))` :
+      branch === 'FME' ? `(sem IN (1, 2)) AND branch != 'MBA'` :
         branch === 'MBA' ? `(1=1)` : `(sem >= 3)`;
 
-    const branchCondition = branch !== 'FME' ? `AND branch = '${branch}'` : ``;
+    const branchCondition = branch !== 'FME' ? `AND branch = ?` : ``;
+    const tokenCondition = term !== null ? `AND token${term} != 'done'` : ``;
 
-    const query = `SELECT rollno, name FROM studentinfo WHERE ${semCondition} ${branchCondition}`.trim();
+    const query = `SELECT rollno, name FROM studentinfo WHERE ${semCondition} ${branchCondition} ${tokenCondition}`.trim();
+    const queryParams = branch !== 'FME' ? [branch] : [];
 
-    const result = await dbQuery(query, [branch]);
+    const result = await dbQuery(query, queryParams);
+
     // console.log(result);
 
     return result.map((row: any) => ({
@@ -158,7 +168,7 @@ async function sendEmails(branch: string) {
         html: `
           <p>Dear ${student.name},</p>
 
-          <p>We are excited to introduce <strong>TLP - Teach Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
+          <p>We, <b> GCET IQAC </b> are excited to introduce <strong>TLP - Teaching Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
 
           <h4>Why TLP?</h4>
           <ul>
@@ -243,7 +253,7 @@ export async function scheduleEmails(req: Request, res: Response) {
   const lastTimeSlot = timeSlots[timeSlots.length - 1];
   const cronExpressionForDbQuery = `${lastTimeSlot.minute + 1} ${lastTimeSlot.hour} ${end.getDate()} ${end.getMonth() + 1} *`;
 
-  console.log(cronExpressionForDbQuery);
+  // console.log(cronExpressionForDbQuery);
 
   cron.schedule(cronExpressionForDbQuery, async () => {
     try {
