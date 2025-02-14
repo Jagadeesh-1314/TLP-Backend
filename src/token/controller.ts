@@ -90,7 +90,7 @@ export async function fetchTerm(req: Request, res: Response) {
 
 
   } catch (error) {
-    console.error('Error executing query:', error);
+    // console.error('Error executing query:', error);
     return res.status(500).send('Error executing query');
   }
 }

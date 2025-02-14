@@ -186,6 +186,7 @@ async function sendEmails(branch: string) {
           <p>Thank you for your time and support in advancing the education process.</p>
 
           <p>Best regards,<br>
+          GCET IQAC <br>
           TLP Team</p>
         `,
       };
