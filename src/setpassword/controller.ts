@@ -37,7 +37,7 @@ async function sendEmailOTP(user_email: string, otp: string): Promise<boolean> {
 
 export async function requestOTP(req: Request, res: Response) {
   const username = req.body.username.trim();
-  
+
   if (!username.length) {
     return res.json({ error: "Rollno is Required!" });
   }
@@ -66,7 +66,7 @@ export async function requestOTP(req: Request, res: Response) {
 
 export async function verifyOTP(req: Request, res: Response) {
   const username = req.body.username.trim();
-  const { user_otp } = req.body.trim();
+  const user_otp = req.body.user_otp.trim();
 
   try {
     const query = `SELECT * FROM otp_verification WHERE rollno = ? AND otp = ?`;
