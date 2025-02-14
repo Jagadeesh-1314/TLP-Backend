@@ -136,7 +136,7 @@ CREATE TABLE cfreport1 (
     branch VARCHAR(10) NOT NULL,
     batch INT NOT NULL,
     sem INT NOT NULL,
-    percentile DECIMAL(10,4) DEFAULT NULL,
+    percentile DECIMAL(10,2) DEFAULT NULL,
     PRIMARY KEY (branch, batch, sem)
 );
 
@@ -144,7 +144,7 @@ CREATE TABLE cfreport2 (
     branch VARCHAR(10) NOT NULL,
     batch INT NOT NULL,
     sem INT NOT NULL,
-    percentile DECIMAL(10,4) DEFAULT NULL,
+    percentile DECIMAL(10,2) DEFAULT NULL,
     PRIMARY KEY (branch, batch, sem)
 );
 
@@ -203,7 +203,7 @@ CREATE TABLE report1 (
   subcode varchar(50) NOT NULL,
   sec char(1) NOT NULL,
   sem int NOT NULL,
-  percentile decimal(10,4) DEFAULT NULL,
+  percentile decimal(10,2) DEFAULT NULL,
   batch int NOT NULL,
   branch varchar(10) NOT NULL,
   completed int DEFAULT 0,
@@ -217,7 +217,7 @@ CREATE TABLE report2 (
   subcode varchar(50) NOT NULL,
   sec char(1) NOT NULL,
   sem int NOT NULL,
-  percentile decimal(10,4) DEFAULT NULL,
+  percentile decimal(10,2) DEFAULT NULL,
   batch int NOT NULL,
   branch varchar(10) NOT NULL,
   completed int DEFAULT 0,

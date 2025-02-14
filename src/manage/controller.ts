@@ -162,7 +162,7 @@ export async function editDetails(req: Request, res: Response) {
         WHERE subCode = ?
           AND sem = ?
           AND sec = ?
-          AND branch = ?;
+          AND branch = ?
           AND batch = ?;
       `;
       const values = [
@@ -323,7 +323,6 @@ export async function addDetails(req: Request, res: Response) {
     }
   }
 
-  console.log(term);
   try {
     await dbQuery('BEGIN'); // Start transaction
 
