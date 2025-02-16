@@ -31,19 +31,19 @@ export async function getSubjects(req: Request, res: Response) {
     }
 
     // Fetch student details
-    const subjectsQuery = `SELECT sem, sec, branch FROM studentinfo WHERE rollno = ?`;
+    const subjectsQuery = `SELECT sem, sec, branch, batch FROM studentinfo WHERE rollno = ?`;
     const subsresults: any = await dbQuery(subjectsQuery, [username]);
 
     if (subsresults.length === 0) {
       return res.status(404).json({ error: "User not found or no data available" });
     }
 
-    const { sem, sec, branch } = subsresults[0];
+    const { sem, sec, branch, batch } = subsresults[0];
 
     // Fetch subjects
     const query =
       ` SELECT t1.subcode, subjects.subname, t1.facID, f.facName, subjects.qtype
-      FROM (SELECT * FROM timetable WHERE sem = TRIM(?) AND sec = TRIM(?) AND branch = TRIM(?)) AS t1
+      FROM (SELECT * FROM timetable WHERE sem = ? AND sec = ? AND branch = ? AND batch = ?) AS t1
       INNER JOIN subjects ON TRIM(t1.subcode) = TRIM(subjects.subcode)
       INNER JOIN faculty f ON TRIM(t1.facID) = TRIM(f.facID)
       UNION
@@ -53,7 +53,7 @@ export async function getSubjects(req: Request, res: Response) {
       INNER JOIN subjects ON TRIM(e.subcode) = TRIM(subjects.subcode)
       WHERE TRIM(e.rollno) = TRIM(?) ORDER BY subcode;
     `;
-    const subs = await dbQuery(query, [sem, sec, branch, username]) as subjectTableProps;
+    const subs = await dbQuery(query, [sem, sec, branch, batch, username]) as subjectTableProps;
 
     const isFmeActive = ((sem === 1 || sem === 2) && branch !== 'MBA') ? await (async () => {
       const fmeQuery = `SELECT status FROM term WHERE branch = 'FME'`;
