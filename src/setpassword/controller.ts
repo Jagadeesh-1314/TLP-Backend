@@ -15,7 +15,6 @@ async function rollnoExist(username: string) {
   return result.length !== 0;
 }
 
-
 async function sendEmailOTP(user_email: string, otp: string): Promise<boolean> {
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -52,15 +51,27 @@ export async function requestOTP(req: Request, res: Response) {
   const otp = generateOTP();
   const otpExpiration = new Date(Date.now() + 5 * 60 * 1000);
 
-  const query = `INSERT INTO otp_verification (rollno, otp, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE otp = ?, expires_at = ?`
+  const query = `INSERT INTO otp_verification (rollno, otp, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE otp = ?, expires_at = ?`;
 
-  try {
-    await dbQuery(query, [username, otp, otpExpiration, otp, otpExpiration]);
-    await sendEmailOTP(email, otp);
-    return res.json({ success: true, message: `OTP sent to your email ${email}` });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Error sending OTP" });
+  const maxRetries = 3;
+  let attempt = 0;
+  let success = false;
+
+  while (attempt < maxRetries && !success) {
+    try {
+      await dbQuery(query, [username, otp, otpExpiration, otp, otpExpiration]);
+      await sendEmailOTP(email, otp);
+      success = true;
+      return res.json({ success: true, message: `OTP sent to your email ${email}` });
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxRetries) {
+        console.error(error);
+        return res.status(500).json({ error: "Error sending OTP" });
+      }
+      // Wait for a short delay before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
 }
 
