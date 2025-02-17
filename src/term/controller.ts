@@ -122,7 +122,9 @@ const timeSlots = [
   { hour: 8, minute: 30 },
   { hour: 12, minute: 30 },
   { hour: 16, minute: 30 },
-  { hour: 21, minute: 0 },
+  { hour: 23, minute: 10 },
+  { hour: 23, minute: 15 },
+  { hour: 23, minute: 16}
 ];
 
 async function getAllRollNumbers(branch: string): Promise<{ rollno: string; name: string }[]> {
@@ -191,7 +193,8 @@ async function sendEmails(branch: string) {
         `,
       };
 
-      await transporter.sendMail(mailOptions);
+      // await transporter.sendMail(mailOptions);
+      await new Promise((resolve) => setTimeout(resolve, 3600000)); 
       logger.log('info', `Batch of emails sent to students in ${branch} branch`);
     }
 

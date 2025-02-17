@@ -324,7 +324,6 @@ export async function addDetails(req: Request, res: Response) {
   }
 
   try {
-    await dbQuery('BEGIN'); // Start transaction
 
     if (tableName === "timetable") {
       const query: string = `
@@ -339,7 +338,7 @@ export async function addDetails(req: Request, res: Response) {
                   FROM studentinfo s
                   LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
                   LEFT JOIN labscore${term} l ON s.rollno = l.rollno
-                  WHERE s.token${term} = 'undone'
+                  WHERE s.token${term} = 'undone' and s.sem = t.sem and s.sem = l.sem
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL)
               ) AS temp
           );
@@ -351,7 +350,7 @@ export async function addDetails(req: Request, res: Response) {
                   FROM studentinfo s
                   LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
                   LEFT JOIN labscore${term} l ON s.rollno = l.rollno
-                  WHERE s.token${term} = 'undone'
+                  WHERE s.token${term} = 'undone' and s.sem = t.sem and s.sem = l.sem
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL)
               ) AS temp
           );
@@ -364,7 +363,7 @@ export async function addDetails(req: Request, res: Response) {
                   LEFT JOIN theoryscore${term} t ON s.rollno = t.rollno
                   LEFT JOIN labscore${term} l ON s.rollno = l.rollno
                   LEFT JOIN cf${term} c ON s.rollno = c.rollno
-                  WHERE s.token${term} = 'undone'
+                  WHERE s.token${term} = 'undone' and s.sem = t.sem and s.sem = l.sem and s.sem = c.sem
                     AND (t.rollno IS NOT NULL OR l.rollno IS NOT NULL OR c.rollno IS NOT NULL)
               ) AS temp
           );   
@@ -372,58 +371,47 @@ export async function addDetails(req: Request, res: Response) {
           DELETE FROM report${term} WHERE sem = ${sem} AND branch = '${branch}' AND batch = ${batch};
       `;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
-      console.log(query);
-      console.log(result[0])
+      // console.log(query);
+      // console.log(result[0])
       if (result[0].protocol41) {
-        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
-      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" });
 
     } else if (tableName === "studentinfo") {
-      const query: string = `INSERT INTO studentinfo (rollno, Name, sec, sem, branch, batch, token, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-      const result: any = await dbQuery(query, [...(Object.values(details) as any[]), "undone", md5(details.rollno)]);
+      const query: string = `INSERT INTO studentinfo (rollno, Name, sec, sem, branch, batch, token1, token2, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const result: any = await dbQuery(query, [...(Object.values(details) as any[]), "undone", "undone", md5(details.rollno)]);
       if (result.protocol41) {
-        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
-      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "subjects") {
       const query: string = `INSERT INTO subjects (subCode, subName, qtype, def ) VALUES (?, ?, ?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
-        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
-      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "faculty") {
       const query: string = `INSERT INTO faculty ( facID, facName ) VALUES (?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
-        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
-      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
 
     } else if (tableName === "electives") {
       const query: string = `INSERT INTO electives ( rollno, facID, subCode) VALUES (?, ?, ?)`;
       const result: any = await dbQuery(query, [...(Object.values(details) as any[])]);
       if (result.protocol41) {
-        await dbQuery('COMMIT'); // Commit transaction
         return res.json({ done: true });
       }
-      await dbQuery('ROLLBACK'); // Rollback transaction
       return res.status(500).json({ message: "Internal Server Error" })
     }
 
   } catch (err) {
-    await dbQuery('ROLLBACK'); // Rollback transaction in case of error
     logger.log("error", err);
     return res.json(responses.ErrorWhileDBRequest);
   }
