@@ -156,39 +156,46 @@ async function sendEmails(branch: string) {
     const rollNos = await getAllRollNumbers(branch);
 
     const emailAddresses = rollNos.map(rollno => `${rollno}@gcet.edu.in`);
+    const batchSize = 250; // Number of emails to send in each batch
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      bcc: emailAddresses.join(','),
-      subject: 'Important: Visit the Feedback Application',
-      html: `
-        <p>Dear Students,</p>
+    for (let i = 0; i < emailAddresses.length; i += batchSize) {
+      const batch = emailAddresses.slice(i, i + batchSize);
 
-        <p>We, <b> GCET IQAC </b> are excited to introduce <strong>TLP - Teaching Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        bcc: batch.join(','),
+        subject: 'Important: Visit the Feedback Application',
+        html: `
+          <p>Dear Students,</p>
 
-        <h4>Why TLP?</h4>
-        <ul>
-          <li>Streamlines feedback between students and teachers.</li>
-          <li>Provides insights for improving teaching strategies.</li>
-          <li>Delivers detailed performance analytics.</li>
-          <li>Simple, user-friendly interface.</li>
-        </ul>
+          <p>We, <b> GCET IQAC </b> are excited to introduce <strong>TLP - Teaching Learning Progress</strong>, a platform designed to enhance education through effective feedback.</p>
 
-        <h4>To get started, please visit the feedback application at:</h4>
-        <p><a href="https://tlpgcet.github.io" target="_blank">https://tlpgcet.github.io</a></p>
+          <h4>Why TLP?</h4>
+          <ul>
+            <li>Streamlines feedback between students and teachers.</li>
+            <li>Provides insights for improving teaching strategies.</li>
+            <li>Delivers detailed performance analytics.</li>
+            <li>Simple, user-friendly interface.</li>
+          </ul>
 
-        <p>We look forward to your feedback.</p>
+          <h4>To get started, please visit the feedback application at:</h4>
+          <p><a href="https://tlpgcet.github.io" target="_blank">https://tlpgcet.github.io</a></p>
 
-        <p>Thank you for your time and support in advancing the education process.</p>
+          <p>We look forward to your feedback.</p>
 
-        <p>Best regards,<br>
-        GCET IQAC <br>
-        TLP Team</p>
-      `,
-    };
+          <p>Thank you for your time and support in advancing the education process.</p>
 
-    await transporter.sendMail(mailOptions);
-    logger.log('info', `Emails sent to all students in ${branch} branch`);
+          <p>Best regards,<br>
+          GCET IQAC <br>
+          TLP Team</p>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      logger.log('info', `Batch of emails sent to students in ${branch} branch`);
+    }
+
+    logger.log('info', `All emails sent to students in ${branch} branch`);
 
   } catch (error) {
     logger.log('error', `Failed to send emails: ${error}`);

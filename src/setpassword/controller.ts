@@ -53,25 +53,13 @@ export async function requestOTP(req: Request, res: Response) {
 
   const query = `INSERT INTO otp_verification (rollno, otp, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE otp = ?, expires_at = ?`;
 
-  const maxRetries = 3;
-  let attempt = 0;
-  let success = false;
-
-  while (attempt < maxRetries && !success) {
-    try {
-      await dbQuery(query, [username, otp, otpExpiration, otp, otpExpiration]);
-      await sendEmailOTP(email, otp);
-      success = true;
-      return res.json({ success: true, message: `OTP sent to your email ${email}` });
-    } catch (error) {
-      attempt++;
-      if (attempt >= maxRetries) {
-        console.error(error);
-        return res.status(500).json({ error: "Error sending OTP" });
-      }
-      // Wait for a short delay before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+  try {
+    await dbQuery(query, [username, otp, otpExpiration, otp, otpExpiration]);
+    await sendEmailOTP(email, otp);
+    return res.json({ success: true, message: `OTP sent to your email ${email}` });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Error sending OTP" });
   }
 }
 
@@ -99,7 +87,7 @@ export async function verifyOTP(req: Request, res: Response) {
       return res.json({ verified: false, error: "Invalid OTP" });
     }
 
-    await dbQuery('UPDATE otp_verification SET verified = TRUE WHERE rollno = ?', [username]);
+    await dbQuery('UPDATE otp_verification SET verified = TRUE WHERE rollno = ? AND otp = ?', [username, user_otp]);
     return res.json({ verified: true, message: "OTP verified successfully" });
   } catch (error) {
     console.error(error);
