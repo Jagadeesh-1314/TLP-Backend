@@ -61,6 +61,9 @@ CREATE TABLE theoryscore2 (
     PRIMARY KEY (rollno, facID, subcode, sem, batch)
 );
 
+-- Assuming the `faculty` table has a column `facID` as the primary key
+-- and the `subject` table has a column `subCode` as the primary key
+
 CREATE TABLE timetable (
     facID VARCHAR(15) NOT NULL,
     subCode VARCHAR(25) NOT NULL,
@@ -68,8 +71,11 @@ CREATE TABLE timetable (
     sec VARCHAR(5) NOT NULL,
     batch INT NOT NULL,
     branch VARCHAR(10) NOT NULL,
-    PRIMARY KEY (facID, subCode, sem, sec, branch, batch)
+    PRIMARY KEY (facID, subCode, sem, sec, branch, batch),
+    CONSTRAINT fk_facID FOREIGN KEY (facID) REFERENCES faculty(facID) ON DELETE CASCADE,
+    CONSTRAINT fk_subCode FOREIGN KEY (subCode) REFERENCES subject(subCode) ON DELETE CASCADE
 );
+
 
 CREATE TABLE users (
     userName VARCHAR(255) NOT NULL,
